@@ -39,3 +39,6 @@ app/*.asar
 python_engine/build/
 python_engine/dist/
 python_engine/*.egg-info/
+
+# 외부 실행 파일
+bin/
