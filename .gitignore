@@ -1,0 +1,41 @@
+# 빌드 결과물
+/build/
+**/dist/
+**/out/
+
+# 의존성
+node_modules/
+python_engine/__pycache__/
+python_engine/**/*.pyc
+python_engine/**/*.pyo
+python_engine/**/*.pyd
+python_engine/.Python
+
+# 가상환경 (venv 등)
+venv/
+env/
+.env
+
+# 로그 파일
+*.log
+
+# vscode 설정
+.vscode/
+
+# 기타 임시 파일
+.DS_Store
+Thumbs.db
+.idea/
+
+# OS 임시 파일
+*.swp
+*.swo
+*.swn
+
+# Electron 빌드
+app/*.asar
+
+# Python 빌드
+python_engine/build/
+python_engine/dist/
+python_engine/*.egg-info/
