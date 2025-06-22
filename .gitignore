@@ -44,7 +44,7 @@ python_engine/*.egg-info/
 bin/
 
 # 샘플 데이터
-python_engine/sampl_video/
+python_engine/sample_video/
 
 # 샘플 출력 결과물
 python_engine/sample_output/
