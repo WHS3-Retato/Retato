@@ -5,6 +5,16 @@ INPUT_FILE = r"E:\Retato\python_engine\sample_video\sample.avi"
 OUTPUT_DIR = r"E:\Retato\python_engine\sample_output"
 MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024
 
+# 경로 유효성 검사
+if not os.path.exists(INPUT_FILE):
+    raise FileNotFoundError(f"입력 파일 경로가 존재하지 않습니다: {INPUT_FILE}")
+
+if not os.path.isdir(OUTPUT_DIR):
+    try:
+        os.makedirs(OUTPUT_DIR)
+    except Exception as e:
+        raise RuntimeError(f"출력 디렉토리 생성 실패: {OUTPUT_DIR}\n원인: {e}")
+
 def extract_channel_from_slack(data, start_offset, signature):
     offset = start_offset
     end = len(data)
