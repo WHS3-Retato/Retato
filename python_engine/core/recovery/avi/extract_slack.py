@@ -53,6 +53,7 @@ def extract_channel_from_slack(data, start_offset, signature):
 
         # NAL 검사
         if not (data[chunk_start:chunk_start + 4] == b'\x00\x00\x00\x01'):
+            print(f"[경고] 잘못된 NAL prefix (offset=0x{index:X})")
             offset = index + 4
             continue
 
