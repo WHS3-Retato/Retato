@@ -37,7 +37,17 @@ def extract_channel_from_slack(data, start_offset, signature):
         chunk_end = chunk_start + size
         aligned = size + (size % 2)
 
-        if size > MAX_REASONABLE_CHUNK_SIZE or chunk_end > end or size < 5:
+        # 프레임 크기 유효성 검사
+        if size > MAX_REASONABLE_CHUNK_SIZE:
+            print(f"[경고] 비정상적으로 큰 프레임 (size={size}, offset=0x{index:X})")
+            offset = index + 4
+            continue
+        if size < 5:
+            print(f"[경고] 너무 작은 프레임 (size={size}, offset=0x{index:X})")
+            offset = index + 4
+            continue
+        if chunk_end > end:
+            print(f"[경고] 프레임이 파일 끝을 넘어감 (size={size}, offset=0x{index:X})")
             offset = index + 4
             continue
 
