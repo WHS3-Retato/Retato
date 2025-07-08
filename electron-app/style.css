@@ -1,0 +1,122 @@
+body {
+    background-color: #ecf2f8;
+    margin: 0;
+}
+
+.container {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: flex-start;
+}
+
+.menu_box {
+    width: 173px;
+    height: 640px;
+    background-color: #1F2937;
+    border-radius: 12px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.logo_section {
+    display: flex;
+    align-items: center;
+}
+
+.logo_icon {
+    display: flex;
+    align-items: center;
+    padding: 30px 10px 20px 15px;
+    gap: 8px;   
+    width: 25px;
+}
+
+.logo_text {
+    font-size: 27px;
+    font-weight: bold;
+    color: #ffffff;
+    margin-top: 6px;
+}
+
+h3 {
+    margin-top: 30px;
+    margin-bottom: 10px;
+}
+
+.main_content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+h1 {
+    margin-top: -5px;
+    margin-bottom: 1px;
+}
+
+.drive-category {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow:
+        inset -4px -4px 4px rgba(0, 0, 0, 0.05), /* Inner shadow */
+        0 5px 20px rgba(0, 0, 0, 0.25);       box-sizing: border-box;
+    margin-top: 2%;
+}
+
+.drive-category h2 {
+    padding: 5px;
+    font-size: 17px;
+    font-weight: bold;
+    color: #101010;
+    display: flex;
+    text-align: center;
+}
+
+#internal-list, #external-list, #portable-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.drive-card {
+    width: 350px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e8e8e8;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+}
+
+.drive-card .info {
+    flex-grow: 1;
+}
+
+.drive-card .bar {
+    width: 200px;
+    height: 10px;
+    border-radius: 5px;
+    background: #F4F4F4;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.drive-card .bar-fill {
+    height: 100%;
+    background: #3B82F6;
+    transition: width 0.6s ease
+}
+
+#explorer div {
+  margin: 4px 0;
+  padding-left: 10px;
+}
+#explorer h3 {
+  margin-bottom: 10px;
+}

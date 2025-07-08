@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
+    <title>Retato</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="sidebar" class="container">
+      <div class="menu_box">
+        <div class="logo_section">
+          <img src="logo.svg" alt="로고 아이콘" class="logo_icon"/>
+          <span class="logo_text">RETATO</span>
+          
+        </div>
+      </div>
+      <div class="main_content">
+        <h1>드라이브를 선택해 복원을 시작하세요.</h1>
+
+        <div class="drive-category">
+          <h2>내장 드라이브</h2>
+          <div id="internal-list"></div>
+        </div>
+
+        <div class="drive-category external_drive">
+          <h2>외장 드라이브</h2>
+          <div id="external-list"></div>
+        </div>
+
+        <div class="drive-category portable_drive">
+          <h2>이동식 드라이브</h2>
+          <div id="portable-list"></div>
+        </div>
+        <div id="explorer" style="margin-top: 2rem;"></div>
+
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
