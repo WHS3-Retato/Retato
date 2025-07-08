@@ -1,8 +1,10 @@
 import os
 import struct
+from python_engine.core.recovery.utils.ffmpeg_wrapper import convert_video
 
 INPUT_FILE = r"E:\Retato\python_engine\sample_video\sample.avi"
 OUTPUT_DIR = r"E:\Retato\python_engine\sample_output"
+TARGET_FORMAT = "mp4"
 
 # 최대 허용 가능한 프레임 크기 (10MB)
 MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024
@@ -23,7 +25,6 @@ def extract_channel_by_signature(data, signature: bytes, valid_end: int):
         chunk_start = index + 8
         chunk_end = chunk_start + size
 
-        # 사이즈 검사
         # 사이즈 검사
         if size > MAX_REASONABLE_CHUNK_SIZE:
             print(f"[WARNING] 비정상적으로 큰 프레임 (size={size}, offset=0x{index:X})")
@@ -84,16 +85,23 @@ def split_normal_channels():
 
     # FRONT 채널
     front_chunks, front_count, sps, pps = extract_channel_by_signature(data, b'00dc', valid_end)
-    front_path = os.path.join(OUTPUT_DIR, 'normal_front.h264')
-    write_chunks(front_path, front_chunks, sps, pps)
+    front_h264_path = os.path.join(OUTPUT_DIR, 'normal_front.h264')
+    write_chunks(front_h264_path, front_chunks, sps, pps)
 
     # REAR 채널
     rear_chunks, rear_count, sps_r, pps_r = extract_channel_by_signature(data, b'01dc', valid_end)
-    rear_path = os.path.join(OUTPUT_DIR, 'normal_rear.h264')
-    write_chunks(rear_path, rear_chunks, sps_r, pps_r)
+    rear_h264_path = os.path.join(OUTPUT_DIR, 'normal_rear.h264')
+    write_chunks(rear_h264_path, rear_chunks, sps_r, pps_r)
 
-    print(f"FRONT 채널: {front_count}개 프레임 → {front_path}")
-    print(f"REAR 채널: {rear_count}개 프레임 → {rear_path}")
+    print(f"[INFO] FRONT 채널: {front_count}개 프레임 → {front_h264_path}")
+    print(f"[INFO] REAR 채널: {rear_count}개 프레임 → {rear_h264_path}")
+
+    # 변환
+    front_output_path = front_h264_path.replace(".h264", f".{TARGET_FORMAT}")
+    rear_output_path = rear_h264_path.replace(".h264", f".{TARGET_FORMAT}")
+
+    convert_video(front_h264_path, front_output_path, TARGET_FORMAT)
+    convert_video(rear_h264_path, rear_output_path, TARGET_FORMAT)
 
 if __name__ == "__main__":
     split_normal_channels()
