@@ -21,37 +21,64 @@ def open_e01_image(e01_path):
     return EWFImgInfo(ewf_handle)
 
 def extract_mp4_files(fs_info, output_dir, path="/"):
+    results = []
     directory = fs_info.open_dir(path=path)
+
     for entry in directory:
         if entry.info.name.name in [b'.', b'..'] or entry.info.meta is None:
             continue
 
         name = entry.info.name.name.decode('utf-8', 'ignore')
-        filepath = os.path.join(path, name)
+        filepath = f"{path.rstrip('/')}/{name}"
 
         if entry.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
             try:
-                sub_directory = entry.as_directory()
-                extract_mp4_files(fs_info, output_dir, filepath)
+                sub_results = extract_mp4_files(fs_info, output_dir, filepath)
+                results.extend(sub_results)
             except Exception as e:
                 print(f"[Skip] Cannot access directory: {filepath} - {e}")
+
         elif name.lower().endswith('.mp4'):
             print(f"\n[Found] MP4 file detected: {filepath}")
             try:
                 f = fs_info.open(filepath)
-                out_path = os.path.join(output_dir, name)
+                size = f.info.meta.size
+
+                # 생성 시간 → 사람이 읽기 쉬운 문자열
+                ctime = f.info.meta.crtime
+                ctime_str = datetime.datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M:%S") if ctime else None
+
+                # 저장 파일명 구성
+                relative_path = filepath.strip("/").replace("/", "_")
+                out_path = os.path.join(output_dir, relative_path)
+
+                # 파일 저장
                 with open(out_path, 'wb') as out_file:
                     offset = 0
-                    size = f.info.meta.size
                     while offset < size:
                         chunk = f.read_random(offset, min(1024 * 1024, size - offset))
+                        if not chunk:
+                            break
                         out_file.write(chunk)
                         offset += len(chunk)
+
                 print(f"[Extracted] Saved to: {out_path}")
                 print("-" * 60)
+
+                # 결과 추가
+                results.append({
+                    "name": name,
+                    "path": filepath,
+                    "size": size,
+                    "ctime": ctime_str,
+                    "saved_path": out_path
+                })
+
             except Exception as e:
                 print(f"[Error] Failed to extract {filepath}: {e}")
                 print("-" * 60)
+
+    return results
 
 
 def main():
