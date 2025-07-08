@@ -26,17 +26,17 @@ def extract_channel_by_signature(data, signature: bytes, valid_end: int):
         # 사이즈 검사
         # 사이즈 검사
         if size > MAX_REASONABLE_CHUNK_SIZE:
-            print(f"[경고] 비정상적으로 큰 프레임 (size={size}, offset=0x{index:X})")
+            print(f"[WARNING] 비정상적으로 큰 프레임 (size={size}, offset=0x{index:X})")
             offset = index + 4
             continue
 
         if chunk_end - chunk_start < 5:
-            print(f"[경고] 너무 작은 프레임 (size={size}, offset=0x{index:X})")
+            print(f"[WARNING] 너무 작은 프레임 (size={size}, offset=0x{index:X})")
             offset = index + 4
             continue
 
         if chunk_end > valid_end:
-            print(f"[경고] 프레임이 파일 끝을 넘어감 (size={size}, offset=0x{index:X})")
+            print(f"[WARNING] 프레임이 파일 끝을 넘어감 (size={size}, offset=0x{index:X})")
             offset = index + 4
             continue
 
@@ -45,7 +45,7 @@ def extract_channel_by_signature(data, signature: bytes, valid_end: int):
         nal_type = data[chunk_start + 4] & 0x1F
 
         if nal_prefix != b'\x00\x00\x00\x01':
-            print(f"[경고] 잘못된 NAL prefix (offset=0x{index:X})")
+            print(f"[WARNING] 잘못된 NAL prefix (offset=0x{index:X})")
             offset = index + 4
             continue
 
