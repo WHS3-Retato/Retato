@@ -27,7 +27,7 @@ def classifty_video_name(filename):
 
     timestamp = datetime.fromtimestamp(os.path.getmtime(filename)).strftime('%Y%m%d_%H%M%S')
 
-    label = "_SLACK" if is_slack else ""
+    label = "_HIDDEN" if is_slack else ""
     if is_front:
         stem = f"{timestamp}_FRONT{label}"
     elif is_rear:
