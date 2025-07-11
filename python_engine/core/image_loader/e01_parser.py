@@ -320,12 +320,23 @@ def main():
                 total_count=total_files,
                 progress=progress
             )
+            
+            def is_slack_recovered(slack_info):
+                if slack_info.get("recovered_slack"):
+                    return True
+                front = slack_info.get("avi_front", {})
+                rear = slack_info.get("avi_rear", {})
+                return front.get("recovered") or rear.get("recovered")
+            
+            recovered_count = sum(
+                1 for r in results if is_slack_recovered(r["slack_info"])
+            )
 
-            # 결과를 JSON으로 저장
+            # 결과 JSON으로 저장
             if results:
                 with open(os.path.join(OUTPUT_DIR, "extracted_videos.json"), "w", encoding="utf-8") as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
-                print(f"총 {total_files}개 중 {len(results)}개의 영상이 추출되었습니다.")
+                print(f"총 {total_files}개 중 {recovered_count}개의 영상이 추출되었습니다.")
             else:
                 print(f"추출된 영상이 없습니다.")
             break
