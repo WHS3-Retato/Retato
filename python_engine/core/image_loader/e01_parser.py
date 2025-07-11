@@ -8,6 +8,17 @@ import tkinter as tk
 from tkinter import filedialog
 from io import BytesIO
 import time
+import logging
+from python_engine.core.recovery.mp4.extract_slack import recover_mp4_slack
+from python_engine.core.recovery.avi.extract_slack import recover_avi_slack
+from python_engine.core.recovery.avi.avi_split_channel import split_avi_channels
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 VIDEO_EXTENSIONS = ('.mp4', '.avi')
 OUTPUT_DIR = os.path.join("python_engine", "sample_output", "extracted_videos")
@@ -119,7 +130,7 @@ def count_video_files(fs_info, path="/"):
             elif name.lower().endswith(VIDEO_EXTENSIONS):
                 count += 1
     except Exception as e:
-        print(f"[WARNING] 파일 수 세기 실패: {path} → {e}")
+        logger.warning(f"파일 수 세기 실패: {path} → {e}")
     return count
 
 def extract_video_files(fs_info, output_dir, path="/", include_all=True, total_count=None, progress=None):
@@ -163,7 +174,7 @@ def extract_video_files(fs_info, output_dir, path="/", include_all=True, total_c
                 chunk = f.read_random(offset, chunk_size)
                 
                 if not chunk:
-                    print(f"[WARNING] {filepath} → chunk가 비어 있음. 루프 중단.")
+                    logger.warning(f"{filepath} → chunk가 비어 있음. 루프 중단.")
                     break
 
                 buffer.write(chunk)
@@ -171,7 +182,7 @@ def extract_video_files(fs_info, output_dir, path="/", include_all=True, total_c
                 iteration += 1
             
             if iteration >= max_iterations:
-                print(f"[WARNING] {filepath} → max_iterations 도달. 루프 강제 종료.")
+                logger.warning(f"{filepath} → max_iterations 도달. 루프 강제 종료.")
 
             full_data = buffer.getvalue()
             suspected_slack = False
@@ -182,7 +193,7 @@ def extract_video_files(fs_info, output_dir, path="/", include_all=True, total_c
                 suspected_slack = has_avi_slack(full_data)
 
             if not include_all and not suspected_slack:
-                print(f"[SKIP] {filepath} → 슬랙 의심 영역 없음")
+                logger.info(f"[SKIP] {filepath} → 슬랙 의심 영역 없음")
                 continue
 
             category = classify_by_prefix(name)
@@ -198,6 +209,45 @@ def extract_video_files(fs_info, output_dir, path="/", include_all=True, total_c
                 out_file.write(full_data)
 
             print(f"[SAVED] 추출 완료: {final_path}")
+
+            # 복원 정보 초기값
+            slack_info = {}
+            split_info = {}
+
+            if name_lower.endswith(".mp4"):
+                recovery = recover_mp4_slack(
+                    filepath=final_path,
+                    output_h264_dir=os.path.join(output_dir, "recovered_h264"),
+                    output_video_dir=os.path.join(output_dir, "recovered_mp4")
+                )
+                slack_info.update({
+                    "recovered_slack": recovery["recovered"],
+                    "recovered_slack_frame_count": recovery["frame_count"],
+                    "recovered_slack_path": recovery["output_path"]
+                })
+            
+            elif name_lower.endswith(".avi"):
+                recovery = recover_avi_slack(
+                    filepath=final_path,
+                    output_h264_dir=os.path.join(output_dir, "recovered_h264"),
+                    output_video_dir=os.path.join(output_dir, "recovered_mp4")
+                )
+                slack_info.update({
+                    "avi_front": recovery["front"],
+                    "avi_rear": recovery["rear"]
+                })
+
+                split = split_avi_channels(
+                    filepath=final_path,
+                    output_h264_dir=os.path.join(output_dir, "split_h264"),
+                    output_video_dir=os.path.join(output_dir, "split_mp4")
+                )
+                split_info["avi_channel_split"] = {
+                    "front": split["front"],
+                    "rear": split["rear"]
+                }
+
+            # 결과 기록
             results.append({
                 "name": name,
                 "category": category,
@@ -205,11 +255,13 @@ def extract_video_files(fs_info, output_dir, path="/", include_all=True, total_c
                 "size": size,
                 "ctime": ctime_str,
                 "saved_path": final_path,
-                "suspected_slack": suspected_slack
+                "suspected_slack": suspected_slack,
+                "slack_info": slack_info,
+                "split_info": split_info
             })
 
         except Exception as e:
-            print(f"[ERROR] {filepath} 추출 실패: {e}")
+            logger.error(f"{filepath} 추출 실패: {e}")
 
     return results
 
@@ -235,7 +287,7 @@ def main():
         return
 
     include_all = ask_extraction_mode()
-    print("[INFO] 선택 모드:", "전체 추출" if include_all else "슬랙 영상만 추출")
+    logger.info(f"선택 모드: {'전체 추출' if include_all else '슬랙 영상만 추출'}")
     if include_all:
         print("[WARNING] 전체 추출은 시간이 오래 걸릴 수 있습니다. 잠시만 기다려 주세요 ...")
     
@@ -243,7 +295,7 @@ def main():
         img_info = open_e01_image(e01_path)
         volume = pytsk3.Volume_Info(img_info)
     except Exception as e:
-        print(f"[ERROR] E01 이미지 열기 실패: {e}")
+        logger.error(f"E01 이미지 열기 실패: {e}")
         return
     
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -253,9 +305,9 @@ def main():
             fs_offset = part.start * 512
             fs_info = pytsk3.FS_Info(img_info, offset=fs_offset)
 
-            print("[INFO] 전체 영상 수를 계산 중입니다...")
+            logger.info("전체 영상 수를 계산 중입니다...")
             total_files = count_video_files(fs_info)
-            print(f"[INFO] 총 대상 영상 수: {total_files}개")
+            logger.info(f"총 대상 영상 수: {total_files}개")
 
             progress = [0]
 
@@ -271,20 +323,17 @@ def main():
             if results:
                 with open(os.path.join(OUTPUT_DIR, "extracted_videos.json"), "w", encoding="utf-8") as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
-                print(f"[SUCCESS] 총 {total_files}개 중 {len(results)}개의 영상이 추출되었습니다.")
+                print(f"총 {total_files}개 중 {len(results)}개의 영상이 추출되었습니다.")
             else:
-                print(f"[INFO] 추출된 영상이 없습니다.")
+                print(f"추출된 영상이 없습니다.")
             break
         except Exception as e:
-            print(f"[ERROR] 파티션 열기 실패: {e}")
+            logger.error(f"파티션 열기 실패: {e}")
     else:
-        print("[ERROR] 분석 가능한 파티션을 찾을 수 없습니다.")
+        logger.error("분석 가능한 파티션을 찾을 수 없습니다.")
 
     elapsed = int(time.time() - start_time)
-    hours = elapsed // 3600
-    minutes = (elapsed % 3600) // 60
-    seconds = elapsed % 60
-    print(f"[INFO] 총 소요 시간: {hours}시간 {minutes}분 {seconds}초")
+    logger.info(f"총 소요 시간: {elapsed // 3600}시간 {(elapsed % 3600) // 60}분 {elapsed % 60}초")
 
 if __name__ == "__main__":
     main()
