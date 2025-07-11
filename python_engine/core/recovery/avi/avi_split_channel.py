@@ -95,7 +95,7 @@ def split_avi_channels(filepath, output_h264_dir, output_video_dir, target_forma
         
         real_file_size = struct.unpack('<I', data[4:8])[0]
         valid_end = 8 + real_file_size
-    except struct.error:
+    except struct.error as e:
         logger.error(f"{filename} → RIFF size 파싱 실패: {e}")
         return {
             "front": {"success": False, "frame_count": 0, "output_path": None},
