@@ -9,6 +9,8 @@ from tkinter import filedialog
 from io import BytesIO
 import time
 import logging
+import tempfile
+import shutil
 from python_engine.core.recovery.mp4.extract_slack import recover_mp4_slack
 from python_engine.core.recovery.avi.extract_slack import recover_avi_slack
 from python_engine.core.recovery.avi.avi_split_channel import split_avi_channels
@@ -21,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 VIDEO_EXTENSIONS = ('.mp4', '.avi')
-OUTPUT_DIR = os.path.join("python_engine", "sample_output", "extracted_videos")
+OUTPUT_DIR = tempfile.mkdtemp(prefix="retato_")
 
 class EWFImgInfo(pytsk3.Img_Info):
     def __init__(self, ewf_handle):
@@ -334,6 +336,8 @@ def main():
 
     elapsed = int(time.time() - start_time)
     logger.info(f"총 소요 시간: {elapsed // 3600}시간 {(elapsed % 3600) // 60}분 {elapsed % 60}초")
+
+    shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
 
 if __name__ == "__main__":
     main()
