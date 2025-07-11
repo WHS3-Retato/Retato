@@ -1,23 +1,21 @@
 import os
 import re
 import struct
+from python_engine.core.recovery.utils.ffmpeg_wrapper import convert_video
 
-INPUT_FILE = r"E:\Retato\python_engine\sample_video\mp4_sample.mp4"
-OUTPUT_DIR = r"E:\Retato\python_engine\sample_output"
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "mp4_extract_slack.h264") 
+INPUT_DIR = r"E:\Retato\python_engine\sample_video"
+OUTPUT_H264_DIR = r"E:\Retato\python_engine\sample_output\output_h264"
+OUTPUT_VIDEO_DIR = r"E:\Retato\python_engine\sample_output\output_video"
+TARGET_FORMAT = "mp4"
 
-MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024  # 10MB
+MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024 # 10MB
 MIN_VALID_BOX_SIZE = 8 # size + type
 MIN_FRAME_SIZE = 5 # 너무 작은 프레임 필터링 기준
 
-def get_slack_after_moov(path):
-    try:
-        with open(path, 'rb') as f:
-            data = f.read()
-    except FileNotFoundError:
-        print(f"[ERROR] 입력 파일을 찾을 수 없습니다: {path}")
-        return b'', None, None
+os.makedirs(OUTPUT_H264_DIR, exist_ok=True)
+os.makedirs(OUTPUT_VIDEO_DIR, exist_ok=True)
 
+def get_slack_after_moov(data):
     offset = 0
     while offset + MIN_VALID_BOX_SIZE <= len(data):
         try:
@@ -32,7 +30,7 @@ def get_slack_after_moov(path):
             return data[offset + size:], offset + size, data[offset:offset + size]
         
         if size <   MIN_VALID_BOX_SIZE:
-            print(f"[WARNING]] 비정상적인 박스 크기(size={size}) → 루프 종료 @ offset=0x{offset:X}")
+            print(f"[WARNING] 비정상적인 박스 크기(size={size}) → 루프 종료 @ offset=0x{offset:X}")
             break
 
         offset += size
@@ -40,18 +38,13 @@ def get_slack_after_moov(path):
     return b'', None, None
 
 def extract_sps_pps(moov_data):
-    if moov_data is None:
-        print("[ERROR] moov 박스가 존재하지 않습니다.")
-        return b''
-
     avcc_pos = moov_data.find(b'avcC')
     if avcc_pos == -1:
         print("[ERROR] avcC 박스를 찾을 수 없습니다.")
         return b''
 
-    avcc_start = avcc_pos + 4
-
     try:
+        avcc_start = avcc_pos + 4
         sps_len = struct.unpack('>H', moov_data[avcc_start + 6:avcc_start + 8])[0]
         sps_start = avcc_start + 8
         sps = moov_data[sps_start:sps_start + sps_len]
@@ -66,26 +59,10 @@ def extract_sps_pps(moov_data):
         print(f"[ERROR] SPS/PPS 추출 실패: {e}")
         return b''
 
-def recover_from_slack(mp4_path, output_path):
-    slack, slack_offset, moov_data = get_slack_after_moov(mp4_path)
-    if slack_offset is None:
-        print("[ERROR] moov 박스를 찾을 수 없습니다.")
-        return
-
-    print(f"[INFO] 슬랙 영역 시작 offset: 0x{slack_offset:x}")
-
-    if not slack:
-        print("[INFO] 슬랙 영역이 존재하지 않거나 복원 가능한 데이터가 없습니다.")
-        return
-
-    sps_pps = extract_sps_pps(moov_data)
-    if not sps_pps:
-        print("[ERROR] SPS/PPS 추출 실패")
-        return
-
+def extract_frames(slack, slack_offset, sps_pps, output_h264_path):
     iframe_pattern = re.compile(b'\x00.{3}[\x25\x45\x65]\x88\x80')
     pframe_pattern = re.compile(b'\x00\x00.{2}[\x21\x41\x61]\x9A')
-
+    
     matches = []
     for ftype, pattern in [("I", iframe_pattern), ("P", pframe_pattern)]:
         for m in pattern.finditer(slack):
@@ -94,32 +71,23 @@ def recover_from_slack(mp4_path, output_path):
     matches.sort(key=lambda x: x[0])
 
     has_i_frame = any(ftype == "I" for _, ftype in matches)
-    if not has_i_frame or len(matches) < 3:
+    if not any(ft == "I" for _, ft in matches) or len(matches) < 3:
         print("[INFO] 슬랙 영역이 존재하지 않거나 복원 가능한 데이터가 없습니다.")
-        return
-
-    try:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    except PermissionError:
-        print("[ERROR] 출력 디렉토리를 생성할 수 없습니다")
-        return
+        return 0
     
     recovered = 0
-    with open(output_path, 'wb') as f:
+    with open(output_h264_path, 'wb') as f:
         f.write(sps_pps)
         for start, ftype in matches:
             try:
                 size = struct.unpack('>I', slack[start:start + 4])[0]
-                if size > MAX_REASONABLE_CHUNK_SIZE:
-                    print(f"[WARNING] 너무 큰 프레임 size={size} @ offset=0x{slack_offset + start:X}")
-                    continue
-                if size < MIN_FRAME_SIZE:
-                    print(f"[WARNING] 너무 작은 프레임 size={size} @ offset=0x{slack_offset + start:X}")
+                if size > MAX_REASONABLE_CHUNK_SIZE or size < MIN_FRAME_SIZE:
+                    print(f"[WARNING] size={size} @ offset=0x{slack_offset + start:X} → skip")
                     continue
 
                 end = start + 4 + size
                 if end > len(slack):
-                    print(f"[WARNING] 프레임이 슬랙 영역을 초과함 (offset=0x{slack_offset + start:X}, size={size})")
+                    print(f"[WARNING] 슬랙 초과 frame @ (offset=0x{slack_offset + start:X}")
                     continue
 
                 f.write(b'\x00\x00\x00\x01' + slack[start + 4:end])
@@ -128,7 +96,40 @@ def recover_from_slack(mp4_path, output_path):
             except (struct.error, IndexError):
                 continue
 
-    print(f"[INFO] 총 {recovered}개 프레임 저장 완료 → {output_path}")
+    return recovered
+
+def process_mp4_file(filepath):
+    filename = os.path.splitext(os.path.basename(filepath))[0]
+    h264_path = os.path.join(OUTPUT_H264_DIR, f"{filename}_slack.h264")
+    mp4_path = os.path.join(OUTPUT_VIDEO_DIR, f"{filename}_slack.{TARGET_FORMAT}")
+
+    with open(filepath, 'rb') as f:
+        data = f.read()
+
+    slack, slack_offset, moov_data = get_slack_after_moov(data)
+    if slack_offset is None:
+        print(f"[ERROR] {filename} → moov 박스 없음 → skip")
+        return
+    
+    print(f"[INFO] 슬랙 영역 시작 offset: 0x{slack_offset:X}")
+    sps_pps = extract_sps_pps(moov_data)
+    if not sps_pps:
+        print(f"[ERROR] {filename} → SPS/PPS 추출 실패 → skip")
+        return
+    
+    count = extract_frames(slack, slack_offset, sps_pps, h264_path)
+    print(f"[INFO] 복구된 프레임 수: {count}개 → {h264_path}")
+
+    if count > 0:
+        convert_video(h264_path, mp4_path, TARGET_FORMAT)
+    else:
+        print(f"[SKIP] {filename} → 유효한 프레임이 없어 변환 생략")
+
+def extract_slack_from_all_mp4():
+    for file in os.listdir(INPUT_DIR):
+        if file.lower().endswith('.mp4'):
+            print(f"\n[INFO] MP4 파일 처리 중: {file}")
+            process_mp4_file(os.path.join(INPUT_DIR, file))
 
 if __name__ == "__main__":
-    recover_from_slack(INPUT_FILE, OUTPUT_FILE)
+    extract_slack_from_all_mp4()
