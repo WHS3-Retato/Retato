@@ -1,18 +1,18 @@
 import os
 import struct
+import logging
 from python_engine.core.recovery.utils.ffmpeg_wrapper import convert_video
 
-INPUT_DIR = r"E:\Retato\python_engine\sample_video"
-OUTPUT_H264_DIR = r"E:\Retato\python_engine\sample_output\output_h264"
-OUTPUT_VIDEO_DIR = r"E:\Retato\python_engine\sample_output\output_video"
-TARGET_FORMAT = "mp4"
-MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger(__name__)
 
+MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024
 FRONT_SIGNATURE = b'00dc'
 REAR_SIGNATURE = b'01dc'
-
-os.makedirs(OUTPUT_H264_DIR, exist_ok=True)
-os.makedirs(OUTPUT_VIDEO_DIR, exist_ok=True)
 
 def extract_channel_from_slack(data, start_offset, signature):
     offset = start_offset
@@ -38,21 +38,21 @@ def extract_channel_from_slack(data, start_offset, signature):
 
         # 프레임 크기 유효성 검사
         if size > MAX_REASONABLE_CHUNK_SIZE:
-            print(f"[WARNING] 비정상적으로 큰 프레임 (size={size}, offset=0x{index:X})")
+            logger.debug(f"비정상적으로 큰 프레임 (size={size}, offset=0x{index:X}) → skip")
             offset = index + 4
             continue
         if size < 5:
-            print(f"[WARNING] 너무 작은 프레임 (size={size}, offset=0x{index:X})")
+            logger.debug(f"너무 작은 프레임 (size={size}, offset=0x{index:X}) → skip")
             offset = index + 4
             continue
         if chunk_end > end:
-            print(f"[WARNING] 프레임이 파일 끝을 넘어감 (size={size}, offset=0x{index:X})")
+            logger.debug(f"프레임이 파일 끝을 넘어감 (size={size}, offset=0x{index:X}) → skip")
             offset = index + 4
             continue
 
         # NAL 검사
         if data[chunk_start:chunk_start + 4] != b'\x00\x00\x00\x01':
-            print(f"[WARNING] 잘못된 NAL prefix (offset=0x{index:X})")
+            logger.debug(f"잘못된 NAL prefix (offset=0x{index:X}) → skip")
             offset = index + 4
             continue
 
@@ -80,7 +80,10 @@ def write_chunks(filepath, chunks, sps=None, pps=None):
         for chunk in chunks:
             f.write(chunk)
 
-def process_slack_from_file(filepath):
+def recover_avi_slack(filepath, output_h264_dir, output_video_dir, target_format="mp4"):
+    os.makedirs(output_h264_dir, exist_ok=True)
+    os.makedirs(output_video_dir, exist_ok=True)
+
     filename = os.path.splitext(os.path.basename(filepath))[0]
     with open(filepath, 'rb') as f:
         data = f.read()
@@ -88,29 +91,43 @@ def process_slack_from_file(filepath):
     try:
         riff_size = struct.unpack('<I', data[4:8])[0]
         slack_start = 8 + riff_size
-    except:
-        print(f"[ERROR] {filename} RIFF 파싱 실패 → 건너뜀")
-        return
+    except Exception as e:
+        logger.error(f"{filename} RIFF 파싱 실패 → 건너뜀: {e}")
+        return {
+            "front": {"recovered": False, "frame_count": 0, "output_path": None},
+            "rear": {"recovered": False, "frame_count": 0, "output_path": None}
+        }
     
-    for label, sig in [('slack_front', b'00dc'), ('slack_rear', b'01dc')]:
+    result = {}
+
+    for label, sig in [('front', FRONT_SIGNATURE), ('rear', REAR_SIGNATURE)]:
         chunks, count, sps, pps = extract_channel_from_slack(data, slack_start, sig)
-        h264_path = os.path.join(OUTPUT_H264_DIR, f"{filename}_{label}.h264")
-        mp4_path = os.path.join(OUTPUT_VIDEO_DIR, f"{filename}_{label}.{TARGET_FORMAT}")
-        
+        h264_path = os.path.join(output_h264_dir, f"{filename}_slack_{label}.h264")
+        mp4_path = os.path.join(output_video_dir, f"{filename}_slack_{label}.{target_format}")
+
         write_chunks(h264_path, chunks, sps, pps)
-        print(f"[INFO] {label.upper()} 채널: {count}개 프레임 → {h264_path}")
+        logger.info(f"{filename} → {label.upper()} 채널: {count}개 프레임 추출됨")
 
         if count > 0:
-            convert_video(h264_path, mp4_path, TARGET_FORMAT)
+            success = convert_video(h264_path, mp4_path, target_format)
+            result[label] = {
+                "recovered": success,
+                "frame_count": count,
+                "output_path": mp4_path if success else None
+            }
+            if success:
+                logger.info(f"{filename} → {label.upper()} 채널 복원 성공 → {mp4_path}")
+            else:
+                logger.warning(f"{filename} → {label.upper()} 채널 FFmpeg 변환 실패")
         else:
-            print(f"[SKIP] {label.upper()} 채널은 유효한 프레임이 없어 변환 생략")
+            if os.path.exists(h264_path):
+                os.remove(h264_path)
+            logger.info(f"{filename} → {label.upper()} 채널: 유효한 프레임 없음 (삭제됨)")
 
-def extract_slack_from_all_files():
-    for file in os.listdir(INPUT_DIR):
-        if file.lower().endswith('.avi'):
-            filepath = os.path.join(INPUT_DIR, file)
-            print(f"\n[INFO] AVI 파일 처리 중: {file}")
-            process_slack_from_file(filepath)
-
-if __name__ == "__main__":
-    extract_slack_from_all_files()
+            result[label] = {
+                "recovered": False,
+                "frame_count": 0,
+                "output_path": None
+            }
+    
+    return result
