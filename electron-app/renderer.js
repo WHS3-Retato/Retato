@@ -7,7 +7,10 @@ function createDriveCard(drive) {
 
   el.innerHTML = `
     <div class="info">
-      <div><strong>${drive.label || drive.mount}</strong></div>
+      <div class="drive-title">
+        <img src="icon_drive.svg" alt="드라이브 아이콘" class="drive_icon">
+        <strong>${drive.label || drive.mount}</strong></div>
+      <div>
       <div>${(used / (1024 ** 3)).toFixed(1)} GB / ${(drive.size / (1024 ** 3)).toFixed(1)} GB</div>
       <div class="bar">
         <div class="bar-fill" style="width: 0%;"></div>
@@ -21,28 +24,25 @@ function createDriveCard(drive) {
   });
 
   el.onclick = () => {
-    loadFolder(drive.mount);
+    const encodedPath = encodeURIComponent(drive.mount);
+    window.location.href = `drive_folder.html?mount=${encodedPath}`;
   };
 
   return el;
 }
 
+const listEls = {
+  internal: document.getElementById('internal-list'),
+  external: document.getElementById('external-list'),
+  portable: document.getElementById('portable-list')
+}
+
 function renderDrives(categorized) {
-    document.getElementById('internal-list').innerHTML = '';
-    document.getElementById('external-list').innerHTML = '';
-    document.getElementById('portable-list').innerHTML = '';
+    Object.keys(listEls).forEach(key => listEls[key].innerHTML = '');
 
-    categorized.internal.forEach(d => {
-        document.getElementById('internal-list').appendChild(createDriveCard(d));
-    });
-
-    categorized.external.forEach(d => {
-        document.getElementById('external-list').appendChild(createDriveCard(d));
-    });
-
-    categorized.portable.forEach(d => {
-        document.getElementById('portable-list').appendChild(createDriveCard(d));
-    });
+    categorized.internal.forEach(d => listEls.internal.appendChild(createDriveCard(d)));
+    categorized.external.forEach(d => listEls.external.appendChild(createDriveCard(d)));
+    categorized.portable.forEach(d => listEls.portable.appendChild(createDriveCard(d)));
 }
 
 window.api.getDrives().then(renderDrives);
@@ -54,23 +54,28 @@ window.api.onDrivesUpdated((newDrives) => {
 
 const explorerDiv = document.getElementById('explorer');
 
+function createExplorerItem(entry) {
+  const item = document.createElement('div');
+  item.textContent = entry.name;
+
+  if (entry.isDirectory) {
+    item.style.fontWeight = 'bold';
+    item.style.cursor = 'pointer';
+    item.onclick = () => loadFolder(entry.path);
+  } else if (entry.isE01) {
+    item.style.color = 'blue';
+  }
+
+  return item;
+}
+
 async function loadFolder(folderPath) {
   const entries = await window.api.readFolder(folderPath);
   explorerDiv.innerHTML = `<h3>${folderPath}</h3>`;
 
   entries.forEach(entry => {
     if (entry.isDirectory || entry.isE01) {
-      const item = document.createElement('div');
-      item.textContent = entry.name;
-
-      if (entry.isDirectory) {
-        item.style.fontWeight = 'bold';
-        item.style.cursor = 'pointer';
-        item.onclick = () => loadFolder(entry.path);
-      } else if (entry.isE01) {
-        item.style.color = 'blue';
-      }
-
+      const item = createExplorerItem(entry);
       explorerDiv.appendChild(item);
     }
   });

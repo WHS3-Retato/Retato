@@ -10,7 +10,7 @@
     <div id="sidebar" class="container">
       <div class="menu_box">
         <div class="logo_section">
-          <img src="icon_logo.svg" alt="앱로고" class="logo_icon"/>
+          <img src="icon_logo.svg" alt="로고 아이콘" class="logo_icon"/>
           <span class="logo_text">RETATO</span>
         </div>
 
@@ -25,29 +25,15 @@
             <img src="icon_information.svg" alt="information 아이콘" class="menu_icon">information</a></li>
         </ul>
       </div>
-      
+
       <div class="main_content">
         <h1>드라이브를 선택해 복원을 시작하세요.</h1>
 
-        <div class="drive-category">
-          <h2>내장 드라이브</h2>
-          <div id="internal-list"></div>
-        </div>
-
-        <div class="drive-category external_drive">
-          <h2>외장 드라이브</h2>
-          <div id="external-list"></div>
-        </div>
-
-        <div class="drive-category portable_drive">
-          <h2>이동식 드라이브</h2>
-          <div id="portable-list"></div>
-        </div>
-        <!-- 선택된 드라이브 파일 탐색 영역 -->
         <section id="explorer" class="explorer-container"></section>
+        <script src="renderer_drive_folder.js"></script>
       </div>
     </div>
 
-    <script src="renderer.js"></script>
+    <script src="renderer_.js"></script>
   </body>
 </html>
