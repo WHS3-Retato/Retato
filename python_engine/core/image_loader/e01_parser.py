@@ -216,38 +216,51 @@ def extract_video_files(fs_info, output_dir, path="/", include_all=True, total_c
             slack_info = {}
             split_info = {}
 
-            if name_lower.endswith(".mp4"):
-                recovery = recover_mp4_slack(
-                    filepath=final_path,
-                    output_h264_dir=os.path.join(output_dir, "recovered_h264"),
-                    output_video_dir=os.path.join(output_dir, "recovered_mp4")
-                )
-                slack_info.update({
-                    "recovered_slack": recovery["recovered"],
-                    "recovered_slack_frame_count": recovery["frame_count"],
-                    "recovered_slack_path": recovery["output_path"]
-                })
+            if suspected_slack:
+                if name_lower.endswith(".mp4"):
+                    recovery = recover_mp4_slack(
+                        filepath=final_path,
+                        output_h264_dir=os.path.join(output_dir, "recovered_h264"),
+                        output_video_dir=os.path.join(output_dir, "recovered_mp4")
+                    )
+                    slack_info.update({
+                        "recovered_slack": recovery["recovered"],
+                        "recovered_slack_frame_count": recovery["frame_count"],
+                        "recovered_slack_path": recovery["output_path"]
+                    })
             
-            elif name_lower.endswith(".avi"):
-                recovery = recover_avi_slack(
-                    filepath=final_path,
-                    output_h264_dir=os.path.join(output_dir, "recovered_h264"),
-                    output_video_dir=os.path.join(output_dir, "recovered_mp4")
-                )
-                slack_info.update({
-                    "avi_front": recovery["front"],
-                    "avi_rear": recovery["rear"]
-                })
+                elif name_lower.endswith(".avi"):
+                    recovery = recover_avi_slack(
+                        filepath=final_path,
+                        output_h264_dir=os.path.join(output_dir, "recovered_h264"),
+                        output_video_dir=os.path.join(output_dir, "recovered_mp4")
+                    )
+                    slack_info.update({
+                        "avi_front": recovery["front"],
+                        "avi_rear": recovery["rear"]
+                    })
 
-                split = split_avi_channels(
-                    filepath=final_path,
-                    output_h264_dir=os.path.join(output_dir, "split_h264"),
-                    output_video_dir=os.path.join(output_dir, "split_mp4")
-                )
-                split_info["avi_channel_split"] = {
-                    "front": split["front"],
-                    "rear": split["rear"]
-                }
+                    split = split_avi_channels(
+                        filepath=final_path,
+                        output_h264_dir=os.path.join(output_dir, "split_h264"),
+                        output_video_dir=os.path.join(output_dir, "split_mp4")
+                    )
+                    split_info["avi_channel_split"] = {
+                        "front": split["front"],
+                        "rear": split["rear"]
+                    }
+
+            def is_slack_recovered(slack_info):
+                if slack_info.get("recovered_slack"):
+                    return True
+                front = slack_info.get("avi_front", {})
+                rear = slack_info.get("avi_rear", {})
+                return front.get("recovered") or rear.get("recovered")
+            
+            if not include_all and suspected_slack and not is_slack_recovered(slack_info):
+                logger.info(f"[DELETE] 슬랙 복원 실패 → 원본 삭제: {final_path}")
+                os.remove(final_path)
+                continue
 
             # 결과 기록
             results.append({
@@ -320,23 +333,23 @@ def main():
                 total_count=total_files,
                 progress=progress
             )
-            
-            def is_slack_recovered(slack_info):
-                if slack_info.get("recovered_slack"):
-                    return True
-                front = slack_info.get("avi_front", {})
-                rear = slack_info.get("avi_rear", {})
-                return front.get("recovered") or rear.get("recovered")
-            
+
             recovered_count = sum(
-                1 for r in results if is_slack_recovered(r["slack_info"])
+                1 for r in results if r['slack_info'] and (
+                    r['slack_info'].get("recovered_slack") or
+                    (r['slack_info'].get("avi_front", {}).get("recovered")) or
+                    (r['slack_info'].get("avi_rear", {}).get("recovered"))
+                )
             )
 
             # 결과 JSON으로 저장
             if results:
                 with open(os.path.join(OUTPUT_DIR, "extracted_videos.json"), "w", encoding="utf-8") as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
-                print(f"총 {total_files}개 중 {recovered_count}개의 영상이 추출되었습니다.")
+                if include_all:
+                    print(f"총 {total_files}개 중 {len(results)}개의 영상이 추출되었습니다.")
+                else:
+                    print(f"총 {total_files}개 중 {recovered_count}개의 영상이 추출되었습니다.")
             else:
                 print(f"추출된 영상이 없습니다.")
             break
@@ -348,7 +361,8 @@ def main():
     elapsed = int(time.time() - start_time)
     logger.info(f"총 소요 시간: {elapsed // 3600}시간 {(elapsed % 3600) // 60}분 {elapsed % 60}초")
 
-    shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+    # 임시 저장 공간 삭제
+    #shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
 
 if __name__ == "__main__":
     main()
