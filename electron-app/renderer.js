@@ -3,23 +3,23 @@ function createDriveCard(drive) {
   const usedPercent = Math.round((used / drive.size) * 100);
 
   const el = document.createElement('div');
-  el.className = 'drive-card';
+  el.className = 'drive_card';
 
   el.innerHTML = `
     <div class="info">
-      <div class="drive-title">
+      <div class="drive_title">
         <img src="icon_drive.svg" alt="드라이브 아이콘" class="drive_icon">
         <strong>${drive.label || drive.mount}</strong></div>
       <div>
       <div>${(used / (1024 ** 3)).toFixed(1)} GB / ${(drive.size / (1024 ** 3)).toFixed(1)} GB</div>
       <div class="bar">
-        <div class="bar-fill" style="width: 0%;"></div>
+        <div class="bar_fill" style="width: 0%;"></div>
       </div>
     </div>
   `;
 
   requestAnimationFrame(() => {
-    const fillBar = el.querySelector('.bar-fill');
+    const fillBar = el.querySelector('.bar_fill');
     fillBar.style.width = `${usedPercent}%`;
   });
 
@@ -32,9 +32,9 @@ function createDriveCard(drive) {
 }
 
 const listEls = {
-  internal: document.getElementById('internal-list'),
-  external: document.getElementById('external-list'),
-  portable: document.getElementById('portable-list')
+  internal: document.getElementById('internal_list'),
+  external: document.getElementById('external_list'),
+  portable: document.getElementById('portable_list')
 }
 
 function renderDrives(categorized) {

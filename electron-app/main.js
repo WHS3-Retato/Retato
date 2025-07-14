@@ -22,20 +22,34 @@ function readFolder(folderPath) {
 }
 
 ipcMain.handle('read-folder', async (event, folderPath) => {
-  const files = await fs.promises.readdir(folderPath, { withFileTypes: true });
-  return files.map(file => {
-    const fullPath = path.join(folderPath, file.name);
-    const isE01 = path.extname(file.name).toLowerCase() === '.e01';
-    const stat = fs.statSync(fullPath);
+   try {
+    const files = fs.readdirSync(folderPath);
 
-    return {
-      name: file.name,
-      path: fullPath,
-      isDirectory: file.isDirectory(),
-      isE01: isE01,
-      size: isE01 ? stat.size : undefined // ✅ 이 부분이 핵심
-    };
-  });
+    const result = files.map(name => {
+      const fullPath = path.join(folderPath, name);
+      let stat;
+
+      try {
+        stat = fs.statSync(fullPath);
+      } catch (err) {
+        // 접근 불가 파일은 건너뜀
+        return null;
+      }
+
+      return {
+        name,
+        path: fullPath,
+        isDirectory: stat.isDirectory(),
+        isE01: name.toLowerCase().endsWith('.e01'),
+        size: stat.size,
+      };
+    }).filter(Boolean); // null 제거
+
+    return result;
+  } catch (err) {
+    console.error('Error reading folder:', err);
+    throw err;
+  }
 });
 
 function createMainWindow() {

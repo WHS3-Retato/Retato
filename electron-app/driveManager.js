@@ -47,28 +47,6 @@ async function getDrivesWithInfo() {
   }
   return categorized;
 }
-/*
-function watchDrives() {
-  driveWatcher = setInterval(async () => {
-    const drives = await drivelist.list();
-    const snapshot = JSON.stringify(drives.map(d => d.device + d.mountpoints[0]?.path));
-
-    /*
-    if (snapshot !== lastDriveSnapshot) {
-      lastDriveSnapshot = snapshot;
-      const categorized = await getDrivesWithInfo();
-      mainWindow?.webContents.send('drives-updated', categorized);
-    }
-  }, 1000); // 2초마다 체크
-  */
-/*
-    const categorized = await getDrivesWithInfo();
-    if (mainWindow?.webContents) {
-      mainWindow?.webContents.send('drives-updated', categorized);
-    }
-  }, 1000);
-}
-*/
 
 function watchDrives() {
   driveWatcher = setInterval(async () => {
