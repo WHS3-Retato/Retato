@@ -1,84 +1,84 @@
 import os
 import shutil
-from datetime import datetime
-from pathlib import Path
+import logging
+from python_engine.core.recovery.utils.ffmpeg_wrapper import convert_video
 
-SAMPLE_VIDEO_DIR = r"E:\Retato\python_engine\sample_video"
-OUTPUT_VIDEO_DIR = r"E:\Retato\python_engine\sample_output\output_video"
-DOWNLOAD_DIR = os.path.join(Path.home(), "Downloads")
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+logger = logging.getLogger(__name__)
 
-def list_videos():
-    videos = []
-    for directory in [SAMPLE_VIDEO_DIR, OUTPUT_VIDEO_DIR]:
-        for file in os.listdir(directory):
-            if file.lower().endswith(('.mp4', '.avi')):
-                videos.append(os.path.join(directory, file))
-    return videos
+def download_videos(video_info_list, download_dir, video_format="mp4"):
+    os.makedirs(download_dir, exist_ok=True)
+    saved = []
 
-def classifty_video_name(filename):
-    name = os.path.basename(filename)
-    stem, ext = os.path.splitext(name)
-    ext = ext.lower()
+    for info in video_info_list:
+        input_path = info.get("output_path")
+        h264_path = info.get("h264_path")
+        original_name = info.get("filename")
 
-    is_slack = 'slack' in stem.lower()
-    is_front = 'front' in stem.lower()
-    is_rear = 'rear' in stem.lower()
+        if not input_path or not os.path.exists(input_path):
+            logger.warning(f"유효하지 않은 영상: {input_path}")
+            continue
 
-    timestamp = datetime.fromtimestamp(os.path.getmtime(filename)).strftime('%Y%m%d_%H%M%S')
+        # 슬랙 영상 여부 판단
+        is_slack = "slack" in original_name.lower() or "hidden" in original_name.lower()
+        desired_fmt = video_format.lower()
+        orig_ext = os.path.splitext(input_path)[1].lower().lstrip('.')
 
-    label = "_HIDDEN" if is_slack else ""
-    if is_front:
-        stem = f"{timestamp}_FRONT{label}"
-    elif is_rear:
-        stem = f"{timestamp}_REAR{label}"
-    elif SAMPLE_VIDEO_DIR in filename:
-        stem = stem  # 원본 파일은 이름 그대로
-    else:
-        stem = f"{timestamp}{label}"
+        name = os.path.splitext(original_name)[0]
+        counter = 1
+        out_name = f"{name}.{desired_fmt}"
+        output_path = os.path.join(download_dir, out_name)
+        while os.path.exists(output_path):
+            output_path = os.path.join(download_dir, f"{name}_copy{counter}.{desired_fmt}")
+            counter += 1
 
-    return stem
-    
-def download_selected_videos():
-    videos = list_videos()
-    if not videos:
-        print("[INFO] 복원된 영상이 존재하지 않습니다.")
-        return
-    
-    print("\n[영상 목록]")
-    for idx, video in enumerate(videos):
-        print(f"{idx + 1}. {os.path.basename(video)}")
-
-    selected = input("\n다운로드할 영상 번호를 쉼표(,)로 구분하여 입력하세요 (예: 1,3,4):" )
-    selected_indexes = [int(x.strip()) - 1 for x in selected.split(',') if x.strip().isdigit()]
-
-    if not selected_indexes:
-        print("[ERROR] 유효한 선택이 없습니다.")
-        return
-    
-    format_input = input("다운로드 포맷을 선택하세요 (mp4 또는 avi): ").strip().lower()
-    if format_input not in ["mp4", "avi"]:
-        print("[ERROR] 지원되지 않는 포맷입니다.")
-        return
-    
-    for idx in selected_indexes:
         try:
-            src = videos[idx]
-            dst_stem = classifty_video_name(src)
-            dst_filename = f"{dst_stem}.{format_input}"
-            dst_path = os.path.join(DOWNLOAD_DIR, dst_filename)
+            if is_slack and h264_path:
+                # 슬랙은 raw h264 -> mp4 고정
+                logger.info(f"[SLACK] 변환: {original_name} → {output_path}")
+                success = convert_video(h264_path, output_path, "mp4")
+                if not success:
+                    logger.error(f"슬랙 영상 변환 실패: {original_name}")
+                    continue
+            
+            else:
+                # non-slack 또는 슬랙이지만 h264_path 없을 때
+                # 1) 원본 확장자 == 원하는 포맷: 그대로 복사
+                if orig_ext == desired_fmt:
+                    shutil.copy2(input_path, output_path)
+                    logger.info(f"복사 완료: {original_name} → {output_path}")
+                
+                # 2) 확장자가 다르면 FFmpeg로 변환 시도
+                else:
+                    logger.info(f"변환 시도: {original_name} ({orig_ext} → {desired_fmt})")
+                    success = convert_video(input_path, output_path, desired_fmt)
+                    if not success:
+                        logger.warning(f"변환 실패: {original_name} → {desired_fmt}")
+                        # fallback: 만약 avi 변환 실패 시 mp4로 시도
+                        if desired_fmt == "avi":
+                            fb_path = os.path.splitext(output_path)[0] + ".mp4"
+                            fb_success = convert_video(input_path, fb_path, "mp4")
+                            if fb_success:
+                                output_path = fb_path
+                                desired_fmt = "mp4"
+                                logger.info(f"fallback mp4 변환 성공 → {fb_path}")
+                            else:
+                                logger.error(f"fallback mp4 변환도 실패: {original_name}")
+                                continue
+                        else:
+                            continue
 
-            # 이미 같은 이름이 있다면 _copy 붙여서 저장
-            counter = 1
-            while os.path.exists(dst_path):
-                dst_filename = f"{dst_stem}_copy{counter}.{format_input}"
-                dst_path = os.path.join(DOWNLOAD_DIR, dst_filename)
-                counter += 1
-
-            shutil.copy2(src, dst_path)
-            print(f"[SUCCESS] {dst_filename} 다운로드 완료 → {DOWNLOAD_DIR}")
+            # 최종 파일 체크
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                saved.append({
+                    "saved_path": output_path,
+                    "filename": os.path.basename(output_path)
+                })
+            else:
+                logger.warning(f"파일이 생성되지 않았거나 0바이트: {output_path}")
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+        
         except Exception as e:
-            print(f"[ERROR] {os.path.basename(src)} 다운로드 실패: {e}")
-
-if __name__ == "__main__":
-    download_selected_videos()
+            logger.error(f"다운로드 중 예외 발생 ({original_name}): {e}")
+    
+    return saved

@@ -1,3 +1,70 @@
+import os
+
+def get_structure_info(file_path):
+    ext = os.path.splitext(file_path)[1].lower()
+    try:
+        if ext == ".mp4":
+            with open(file_path, 'rb') as file:
+                data = file.read()
+            file_size = len(data)
+            lines = parse_box(data, 0, file_size)
+            return {"type": "mp4", "structure": lines}
+
+        elif ext == ".avi":
+            lines = []
+            with open(file_path, 'rb') as file:
+                binary_data = file.read()
+                riff_declared_size = int.from_bytes(binary_data[4:8], 'little')
+                actual_size = len(binary_data)
+                lines.append(f"RIFF declared size: 0x{riff_declared_size:06X}")
+                lines.append(f"Actual file size: 0x{actual_size:06X}\n")
+
+                offset = 12
+                while offset < len(binary_data):
+                    chunk_id = binary_data[offset:offset + 4]
+                    if len(chunk_id) < 4:
+                        break
+
+                    try:
+                        chunk_size = int.from_bytes(binary_data[offset + 4:offset + 8], 'little')
+                    except Exception as e:
+                        lines.append(f"[ERROR] 청크 크기 파싱 실패 at offset {hex(offset)}: {e}")
+                        break
+
+                    chunk_end = offset + 8 + chunk_size
+                    if chunk_end > len(binary_data):
+                        lines.append(f"[WARNING] 청크 크기 초과: {chunk_id.decode(errors='replace')} at offset {hex(offset)} size={chunk_size}")
+                        break
+
+                    if chunk_id == b'stsd':
+                        stsd_data = binary_data[offset + 8: offset + 8 + chunk_size]
+                        codec_type = stsd_data[10:14].decode('ascii', errors='replace')
+                        lines.append(f"stsd Start Offset : 0x{offset:X}")
+                        lines.append(f"stsd Size : 0x{chunk_size:X}")
+                        lines.append(f"Codec : {codec_type}")
+
+                    if chunk_id == b'LIST':
+                        list_subtype = binary_data[offset + 8:offset + 12]
+                        label = list_subtype.decode(errors='replace')
+                        lines.append(f"[LIST-{label}] offset: 0x{offset:X} size: 0x{chunk_size:X}")
+
+                    elif chunk_id in [b'JUNK', b'idx1']:
+                        lines.append(f"{chunk_id.decode(errors='replace')} start offset : 0x{offset:X}")
+                        lines.append(f"{chunk_id.decode(errors='replace')} size : 0x{chunk_size:X}")
+
+                    offset += 8 + chunk_size
+                    if chunk_size % 2 == 1:
+                        offset += 1
+                    if offset >= len(binary_data):
+                        break
+
+            return {"type": "avi", "structure": lines}
+
+        else:
+            return {"error": f"지원하지 않는 확장자: {ext}"}
+    except Exception as e:
+        return {"error": f"구조 분석 중 오류 발생: {str(e)}"}
+    
 def parse_box(data, offset, file_size, indent_level=0):
     # MP4 박스 계층 구조 정의
     box_hierarchy = {
@@ -14,7 +81,7 @@ def parse_box(data, offset, file_size, indent_level=0):
 
     while offset < file_size:  # 파일 끝까지 탐색
         if offset + 8 > file_size:  # 파일 끝 범위 방지
-            print(f"[중단] 박스 크기 읽기 실패: offset={hex(offset)}")  # Resolve
+            output.append(f"[WARNING] 박스 크기 읽기 실패: offset={hex(offset)}")
             break
 
         # 박스 크기와 타입 읽기
@@ -22,11 +89,15 @@ def parse_box(data, offset, file_size, indent_level=0):
             box_size = int.from_bytes(data[offset:offset + 4], byteorder='big')
             box_type = data[offset + 4:offset + 8].decode('utf-8', errors='replace')
         except Exception as e:
-            print(f"[오류] 박스 파싱 실패 at offset {hex(offset)}: {e}")  # Resolve
+            output.append(f"[ERROR] 박스 파싱 실패 at offset {hex(offset)}: {e}")
             break
 
         if box_size < 8 or offset + box_size > file_size:
-            print(f"[중단] 비정상적인 박스 크기: {box_type} at offset {hex(offset)} size={box_size}")  # Resolve
+            output.append(f"[WARNING] 비정상적인 박스 크기: {box_type} at offset {hex(offset)} size={box_size}")
+            break
+
+        if box_size == 0:
+            output.append(f"[WARNING] box size == 0 → 무한 루프 방지 종료 at offset {hex(offset)}")
             break
 
         # 박스 정보 추가
@@ -41,65 +112,3 @@ def parse_box(data, offset, file_size, indent_level=0):
         offset += box_size
 
     return output
-
-def mp4_parser(file_path):
-    with open(file_path, "rb") as file:
-        data = file.read()
-
-    file_size = len(data)
-    output_lines = parse_box(data, 0, file_size)
-    print("\n".join(output_lines))
-
-def avi_parser(file_path):
-    with open(file_path, 'rb') as file:
-        binary_data = file.read()
-        file_size = int.from_bytes(binary_data[4:8], 'little')
-        print(f"file size : 0x{file_size:06X}")
-        print(f"file data size : 0x{file_size + 8:06X}\n")
-
-        offset = 12
-        while offset < len(binary_data):
-            chunk_id = binary_data[offset:offset + 4]
-            if len(chunk_id) < 4:
-                break
-
-            try:
-                chunk_size = int.from_bytes(binary_data[offset + 4:offset + 8], "little")
-            except Exception as e:
-                print(f"[오류] 청크 크기 파싱 실패 at offset {hex(offset)}: {e}")  # Resolve
-                break
-
-            chunk_end = offset + 8 + chunk_size
-            if chunk_end > len(binary_data):
-                print(f"[중단] 청크 크기 초과: {chunk_id.decode(errors='replace')} at offset {hex(offset)} size={chunk_size}")  # Resolve
-                break
-
-            if chunk_id == b'stsd':
-                stsd_data = binary_data[offset + 8: offset + 8 + chunk_size]
-                print(f"stsd Start Offset : 0x{offset:X}")
-                print(f"stsd Size : 0x{chunk_size:X}")
-                codec_type = stsd_data[10:14].decode('ascii', errors='replace')
-                print(f"Codec : {codec_type}")
-                codec_data = stsd_data[14:]
-                print("Codec Data (Binary):")
-                print(codec_data.hex())
-
-            if chunk_id == b'LIST':
-                list_subtype = binary_data[offset + 8:offset + 12]
-                if list_subtype == b'hdrl':
-                    print(f"[LIST-hdrl] offset: 0x{offset:X} size: 0x{chunk_size:X}")
-                elif list_subtype == b'movi':
-                    print(f"[LIST-movi] offset: 0x{offset:X} size: 0x{chunk_size:X}")
-                elif list_subtype == b'INFO':
-                    print(f"[LIST-INFO] offset: 0x{offset:X} size: 0x{chunk_size:X}")
-
-            elif chunk_id in [b'JUNK', b'idx1']:
-                print(f"{chunk_id.decode(errors='replace')} start offset : 0x{offset:X}")
-                print(f"{chunk_id.decode(errors='replace')} size : 0x{chunk_size:X}\n")
-
-            offset += 8 + chunk_size
-            if chunk_size % 2 == 1:
-                offset += 1
-
-            if offset >= len(binary_data):
-                break
