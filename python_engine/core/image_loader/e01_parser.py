@@ -1,6 +1,4 @@
 import os
-import json
-import datetime
 import struct
 import pyewf
 import pytsk3
@@ -13,7 +11,9 @@ import tempfile
 import shutil
 from python_engine.core.recovery.mp4.extract_slack import recover_mp4_slack
 from python_engine.core.recovery.avi.extract_slack import recover_avi_slack
-from python_engine.core.recovery.avi.avi_split_channel import split_avi_channels
+from python_engine.core.analyzer.basic_info_parser import get_basic_info
+from python_engine.core.analyzer.integrity import get_integrity_info
+from python_engine.core.analyzer.struc import get_structure_info
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +23,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 VIDEO_EXTENSIONS = ('.mp4', '.avi')
-OUTPUT_DIR = tempfile.mkdtemp(prefix="retato_")
 
 class EWFImgInfo(pytsk3.Img_Info):
     def __init__(self, ewf_handle):
@@ -36,333 +35,220 @@ class EWFImgInfo(pytsk3.Img_Info):
 
     def get_size(self):
         return self._ewf_handle.get_media_size()
+    
+def select_image_file():
+    root = tk.Tk()
+    root.withdraw()
+    return filedialog.askopenfilename(
+        title="이미지 파일 선택 (.E01 또는 .001)",
+        filetypes=[
+            ("이미지(.E01, .001)", "*.E01;*.001")]
+    )
 
-def open_e01_image(e01_path):
-    e01_path = os.path.abspath(e01_path)
-    filenames = pyewf.glob(e01_path)
-    ewf_handle = pyewf.handle()
-    ewf_handle.open(filenames)
-    return EWFImgInfo(ewf_handle)
-
-def classify_by_prefix(name):
-    return name.lower().split("_")[0]
-
-def has_mp4_slack(data, min_slack_size=1024*1024):
-    try:
-        offset = 0
-        file_size = len(data)
-        last_moov_end = 0
-
-        while offset + 8 < file_size:
-            size = struct.unpack('>I', data[offset:offset+4])[0]
-            box_type = data[offset + 4:offset + 8]
-
-            if size < 8 or offset + size > file_size:
-                break
-
-            if box_type == b'moov':
-                last_moov_end = offset + size
-        
-            offset += size
-
-        if last_moov_end > 0:
-            slack_size = file_size - last_moov_end
-            return slack_size > min_slack_size
-    except:
-        return False
-    return False
-
-def has_avi_slack(data, min_slack_size=1024*1024):
-    try:
-        if data[:4] != b'RIFF':
-            return False
-        
-        file_size = len(data)
-        riff_size = struct.unpack('<I', data[4:8])[0]
-        riff_end = 8 + riff_size
-
-        cursor = 12
-        last_chunk_end = cursor
-        slack_regions = []
-
-        while cursor + 8 <= file_size:
-            chunk_start = cursor
-
-            try:
-                chunk_size = struct.unpack('<I', data[cursor + 4:cursor + 8])[0]
-            except:
-                break
-
-            chunk_end = cursor + 8 + chunk_size
-            if chunk_end > file_size:
-                break
-
-            if chunk_start > last_chunk_end:
-                slack_regions.append((last_chunk_end, chunk_start))
-
-            last_chunk_end = chunk_end
-            cursor = chunk_end
-
-            if chunk_size % 2 == 1:
-                cursor += 1
-                last_chunk_end += 1
-        
-        # RIFF 끝 이후 슬랙
-        if riff_end < file_size:
-            slack_regions.append((riff_end, file_size))
-
-        slack_size = sum(end - start for start, end in slack_regions)
-        return slack_size > min_slack_size
-    except:
-        return False
-
+# 이미지 파일(.E01 or .001) 열기
+def open_image_file(img_path):
+    img_path = os.path.abspath(img_path)
+    ext = os.path.splitext(img_path)[1].lower()
+    if ext in ('.e01', '.ex01'):
+        ewf_paths = pyewf.glob(img_path)
+        ewf_handle = pyewf.handle()
+        ewf_handle.open(ewf_paths)
+        return EWFImgInfo(ewf_handle)
+    else:
+        return pytsk3.Img_Info(img_path, pytsk3.TSK_IMG_TYPE_DETECT)
+    
 def count_video_files(fs_info, path="/"):
     count = 0
-    try:
-        directory = fs_info.open_dir(path=path)
-        for entry in directory:
-            if entry.info.name.name in [b'.', b'..'] or entry.info.meta is None:
-                continue
-
-            name = entry.info.name.name.decode('utf-8', 'ignore')
-            filepath = f"{path.rstrip('/')}/{name}"
-
-            if entry.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
-                count += count_video_files(fs_info, filepath)
-            elif name.lower().endswith(VIDEO_EXTENSIONS):
-                count += 1
-    except Exception as e:
-        logger.warning(f"파일 수 세기 실패: {path} → {e}")
+    for e in fs_info.open_dir(path=path):
+        nm = e.info.name.name
+        if nm in (b'.', b'..') or e.info.meta is None:
+            continue
+        name = nm.decode('utf-8', 'ignore')
+        if e.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
+            count += count_video_files(fs_info, path + "/" + name)
+        elif name.lower().endswith(VIDEO_EXTENSIONS):
+            count += 1
     return count
 
-def extract_video_files(fs_info, output_dir, path="/", include_all=True, total_count=None, progress=None):
+def extract_video_files(fs_info, output_dir, path="/", total_count=None, progress=None):
     results = []
-    created_dirs = set()
-    directory = fs_info.open_dir(path=path)
+    processed = 0
+    is_root = (path == "/")
 
-    for entry in directory:
-        if entry.info.name.name in [b'.', b'..'] or entry.info.meta is None:
+    for e in fs_info.open_dir(path=path):
+        nm = e.info.name.name
+        if nm in [b'.', b'..'] or e.info.meta is None:
             continue
 
-        name = entry.info.name.name.decode('utf-8', 'ignore')
+        name = nm.decode('utf-8', 'ignore')
         name_lower = name.lower()
-        filepath = f"{path.rstrip('/')}/{name}"
+        filepath = path.rstrip('/') + '/' + name
 
-        if entry.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
-            results.extend(extract_video_files(fs_info, output_dir, filepath, include_all, total_count, progress))
+        if e.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
+            results += extract_video_files(
+                fs_info, output_dir, filepath, total_count, progress
+            )
+            continue
+        
+        if not name_lower.endswith(VIDEO_EXTENSIONS):
             continue
 
-        if not name.lower().endswith(VIDEO_EXTENSIONS):
-            continue
+        # 처리된 파일 수 카운트
+        processed += 1
+        if progress:
+            progress[0] += 1
+            logger.info(f"[{progress[0]}/{total_count}] 처리 중: {filepath}")
+        
+        # 파일 읽기
+        fobj = fs_info.open(filepath)
+        size = fobj.info.meta.size
+        buffer = BytesIO()
+        offset = 0
+        chunk_size = 4 * 1024 * 1024
 
-        try:
-            if progress is not None:
-                progress[0] += 1
-                print(f"[{progress[0]}/{total_count}] 처리 중: {filepath}")
+        while offset < size:
+            try:
+                chunk = fobj.read_random(offset, min(chunk_size, size - offset))
+            except OSError as e:
+                logger.warning(f"read_random 오류 @ offset={offset}: {e} → 중단")
+                break
 
-            f = fs_info.open(filepath)
-            size = f.info.meta.size
-            ctime = f.info.meta.crtime
-            ctime_str = datetime.datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M:%S") if ctime else None
+            if not chunk:
+                break
 
-            # 메모리 상에서 영상 데이터 읽기
-            buffer = BytesIO()
-            offset = 0
-            max_iterations = size // (4 * 1024 * 1024) + 20
+            buffer.write(chunk)
+            offset += len(chunk)
 
-            iteration = 0
-            while offset < size and iteration < max_iterations:
-                chunk_size = min(4 * 1024 * 1024, size - offset)
-                chunk = f.read_random(offset, chunk_size)
-                
-                if not chunk:
-                    logger.warning(f"{filepath} → chunk가 비어 있음. 루프 중단.")
-                    break
+        data = buffer.getvalue()
 
-                buffer.write(chunk)
-                offset += len(chunk)
-                iteration += 1
-            
-            if iteration >= max_iterations:
-                logger.warning(f"{filepath} → max_iterations 도달. 루프 강제 종료.")
+        # 공통 카테고리
+        category = path.lstrip('/').split('/',1)[0] or "root"
+        
+        # MP4 처리
+        if name_lower.endswith('.mp4'):
+            # 1) 원본 저장
+            orig_dir = os.path.join(output_dir, category)
+            os.makedirs(orig_dir, exist_ok=True)
+            orig_path = os.path.join(orig_dir, name)
+            with open(orig_path, 'wb') as wf:
+                wf.write(data)
 
-            full_data = buffer.getvalue()
-            suspected_slack = False
-            
-            if name_lower.endswith(".mp4"):
-                suspected_slack = has_mp4_slack(full_data)
-            elif name_lower.endswith(".avi"):
-                suspected_slack = has_avi_slack(full_data)
+            # 2) 슬랙 히든 복원 (raw + slack)
+            raw_dir = os.path.join(orig_dir, 'raw')
+            slack_dir = os.path.join(orig_dir, 'slack')
+            os.makedirs(raw_dir, exist_ok=True)
+            os.makedirs(slack_dir, exist_ok=True)
 
-            if not include_all and not suspected_slack:
-                logger.info(f"[SKIP] {filepath} → 슬랙 의심 영역 없음")
-                continue
+            slack_info = recover_mp4_slack(
+                filepath=orig_path,
+                output_h264_dir=raw_dir,
+                output_video_dir=slack_dir,
+                target_format="mp4"
+            )
 
-            category = classify_by_prefix(name)
-            category_dir = os.path.join(output_dir, category)
-
-            if category_dir not in created_dirs:
-                os.makedirs(category_dir, exist_ok=True)
-                created_dirs.add(category_dir)
-
-            final_path = os.path.join(category_dir, name)
-
-            with open(final_path, 'wb') as out_file:
-                out_file.write(full_data)
-
-            print(f"[SAVED] 추출 완료: {final_path}")
-
-            # 복원 정보 초기값
-            slack_info = {}
-            split_info = {}
-
-            if suspected_slack:
-                if name_lower.endswith(".mp4"):
-                    recovery = recover_mp4_slack(
-                        filepath=final_path,
-                        output_h264_dir=os.path.join(output_dir, "recovered_h264"),
-                        output_video_dir=os.path.join(output_dir, "recovered_mp4")
-                    )
-                    slack_info.update({
-                        "recovered_slack": recovery["recovered"],
-                        "recovered_slack_frame_count": recovery["frame_count"],
-                        "recovered_slack_path": recovery["output_path"]
-                    })
-            
-                elif name_lower.endswith(".avi"):
-                    recovery = recover_avi_slack(
-                        filepath=final_path,
-                        output_h264_dir=os.path.join(output_dir, "recovered_h264"),
-                        output_video_dir=os.path.join(output_dir, "recovered_mp4")
-                    )
-                    slack_info.update({
-                        "avi_front": recovery["front"],
-                        "avi_rear": recovery["rear"]
-                    })
-
-                    split = split_avi_channels(
-                        filepath=final_path,
-                        output_h264_dir=os.path.join(output_dir, "split_h264"),
-                        output_video_dir=os.path.join(output_dir, "split_mp4")
-                    )
-                    split_info["avi_channel_split"] = {
-                        "front": split["front"],
-                        "rear": split["rear"]
-                    }
-
-            def is_slack_recovered(slack_info):
-                if slack_info.get("recovered_slack"):
-                    return True
-                front = slack_info.get("avi_front", {})
-                rear = slack_info.get("avi_rear", {})
-                return front.get("recovered") or rear.get("recovered")
-            
-            if not include_all and suspected_slack and not is_slack_recovered(slack_info):
-                logger.info(f"[DELETE] 슬랙 복원 실패 → 원본 삭제: {final_path}")
-                os.remove(final_path)
-                continue
-
-            # 결과 기록
+            # 3) 결과 기록
+            analysis = {
+                'basic': get_basic_info(orig_path),
+                'integrity': get_integrity_info(orig_path),
+                'structure': get_structure_info(orig_path)
+            }
             results.append({
-                "name": name,
-                "category": category,
-                "path": filepath,
-                "size": size,
-                "ctime": ctime_str,
-                "saved_path": final_path,
-                "suspected_slack": suspected_slack,
-                "slack_info": slack_info,
-                "split_info": split_info
+                'name': name,
+                'path': filepath,
+                'size': size,
+                'slack_info': slack_info,
+                'analysis': analysis
             })
+            continue
 
-        except Exception as e:
-            logger.error(f"{filepath} 추출 실패: {e}")
+        # AVI 처리
+        temp_dir = os.path.join(output_dir, category, 'tmp')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_avi = os.path.join(temp_dir, name)
+        with open(temp_avi, 'wb') as wf:
+            wf.write(data)
+
+        # 슬랙 & 채널 복원
+        base_dir = os.path.join(output_dir, category)
+        raw_dir = os.path.join(base_dir, 'raw')
+        slack_dir = os.path.join(base_dir, 'slack')
+        channels_dir = os.path.join(base_dir, 'channels')
+        os.makedirs(raw_dir, exist_ok=True)
+        os.makedirs(slack_dir, exist_ok=True)
+        os.makedirs(channels_dir, exist_ok=True)
+
+        avi_info = recover_avi_slack(
+            input_avi=temp_avi,
+            raw_out_dir=raw_dir,
+            slack_out_dir=slack_dir,
+            channels_out_dir=channels_dir,
+            target_format='mp4'
+        )
+
+        # 전체 채널 MP4 복사
+        for label, info in avi_info.items():
+            full_mp4 = info.get('full_path')
+            if full_mp4 and os.path.exists(full_mp4):
+                chan_dir = os.path.join(output_dir, category, label)
+                os.makedirs(chan_dir, exist_ok=True)
+                dst = os.path.join(chan_dir, os.path.basename(full_mp4))
+                shutil.copy2(full_mp4, dst)
+
+        # 결과 저장
+        results.append({
+            'name': name,
+            'path': filepath,
+            'size': size,
+            'channels': avi_info
+        })
+
+    # 요약 출력
+    if is_root and total_count is not None:
+        logger.info(f"총 {total_count}개 파일 처리 완료")
 
     return results
 
-def select_e01_file():
-    root = tk.Tk()
-    root.withdraw()
-    return filedialog.askopenfilename(title="E01 파일 선택", filetypes=[("E01 파일", "*.E01")])
-
-def ask_extraction_mode():
-    print("\n[SELECT] 어떤 영상만 추출할까요?")
-    print("1. 전체 영상")
-    print("2. 슬랙 영상이 포함된 영상만 추출")
-    return input("선택 (1 또는 2): ").strip() == "1"
-
-def main():
+def extract_videos_from_e01():
     start_time = time.time()
 
-    print("[INFO] E01 이미지 파일을 선택해주세요.")
-    e01_path = select_e01_file()
+    print("이미지 파일(.E01 또는 .001)을 선택해주세요.")
+    img_path = select_image_file()
 
-    if not e01_path:
-        print("[ERROR] E01 파일을 선택하지 않았습니다. 종료합니다.")
-        return
+    if not img_path:
+        print("E01 파일을 선택하지 않았습니다. 종료합니다.")
+        return [], None, 0
 
-    include_all = ask_extraction_mode()
-    logger.info(f"선택 모드: {'전체 추출' if include_all else '슬랙 영상만 추출'}")
-    if include_all:
-        print("[WARNING] 전체 추출은 시간이 오래 걸릴 수 있습니다. 잠시만 기다려 주세요 ...")
-    
     try:
-        img_info = open_e01_image(e01_path)
+        img_info = open_image_file(img_path)
         volume = pytsk3.Volume_Info(img_info)
     except Exception as e:
-        logger.error(f"E01 이미지 열기 실패: {e}")
-        return
-    
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
+        logger.error(f"이미지 열기 실패: {e}")
+        return [], None, 0
+
+    output_dir = tempfile.mkdtemp(prefix="retato_")
+
     for part in volume:
-        try:
-            fs_offset = part.start * 512
-            fs_info = pytsk3.FS_Info(img_info, offset=fs_offset)
+        if part.flags == pytsk3.TSK_VS_PART_FLAG_UNALLOC or part.start == 0:
+            logger.info(f"건너뜀: Unallocated 파티션 (offset: {part.start})")
+            continue
 
-            logger.info("전체 영상 수를 계산 중입니다...")
-            total_files = count_video_files(fs_info)
-            logger.info(f"총 대상 영상 수: {total_files}개")
+        fs = pytsk3.FS_Info(img_info, offset=part.start * 512)
+        total = count_video_files(fs)
+        print(f"전체 대상 영상 수: {total}개")
+        
+        res = extract_video_files(
+            fs,
+            output_dir,
+            path="/",
+            total_count=total,
+            progress=[0]
+        )
+        
+        elapsed = int(time.time() - start_time)
+        h, rem = divmod(elapsed, 3600)
+        m, s = divmod(rem, 60)
+        print(f"소요 시간: {h}시간 {m}분 {s}초")
+        
+        return res, output_dir, total
 
-            progress = [0]
-
-            results = extract_video_files(
-                fs_info,
-                OUTPUT_DIR,
-                include_all=include_all,
-                total_count=total_files,
-                progress=progress
-            )
-
-            recovered_count = sum(
-                1 for r in results if r['slack_info'] and (
-                    r['slack_info'].get("recovered_slack") or
-                    (r['slack_info'].get("avi_front", {}).get("recovered")) or
-                    (r['slack_info'].get("avi_rear", {}).get("recovered"))
-                )
-            )
-
-            # 결과 JSON으로 저장
-            if results:
-                with open(os.path.join(OUTPUT_DIR, "extracted_videos.json"), "w", encoding="utf-8") as f:
-                    json.dump(results, f, indent=2, ensure_ascii=False)
-                if include_all:
-                    print(f"총 {total_files}개 중 {len(results)}개의 영상이 추출되었습니다.")
-                else:
-                    print(f"총 {total_files}개 중 {recovered_count}개의 영상이 추출되었습니다.")
-            else:
-                print(f"추출된 영상이 없습니다.")
-            break
-        except Exception as e:
-            logger.error(f"파티션 열기 실패: {e}")
-    else:
-        logger.error("분석 가능한 파티션을 찾을 수 없습니다.")
-
-    elapsed = int(time.time() - start_time)
-    logger.info(f"총 소요 시간: {elapsed // 3600}시간 {(elapsed % 3600) // 60}분 {elapsed % 60}초")
-
-    # 임시 저장 공간 삭제
-    #shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
-
-if __name__ == "__main__":
-    main()
+    return [], None, 0

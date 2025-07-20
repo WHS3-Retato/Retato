@@ -11,13 +11,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024 # 10MB
-MIN_VALID_BOX_SIZE = 8 # size + type
-MIN_FRAME_SIZE = 5 # 너무 작은 프레임 필터링 기준
+MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024  # 10MB
+MIN_VALID_BOX_SIZE = 8     # size + type
+MIN_FRAME_SIZE = 5         # 너무 작은 프레임 필터링 기준
 
 def get_slack_after_moov(data):
     offset = 0
-    while offset + MIN_VALID_BOX_SIZE <= len(data):
+    total_size = len(data)
+    while offset + MIN_VALID_BOX_SIZE <= total_size:
         try:
             size = struct.unpack('>I', data[offset:offset + 4])[0]
         except struct.error:
@@ -27,15 +28,18 @@ def get_slack_after_moov(data):
         box_type = data[offset + 4:offset + 8].decode("utf-8", errors="ignore")
 
         if box_type == "moov":
-            return data[offset + size:], offset + size, data[offset:offset + size]
-        
+            slack = data[offset + size:]
+            slack_rate = len(slack) / total_size * 100
+            return slack, offset + size, data[offset:offset + size], slack_rate
+
         if size < MIN_VALID_BOX_SIZE:
             logger.warning(f"비정상적인 박스 크기(size={size}) → 루프 종료 @ offset=0x{offset:X}")
             break
 
         offset += size
 
-    return b'', None, None
+    # moov 못 찾았을 때는 빈값 + rate=100%
+    return b'', None, None, 100.0
 
 def extract_sps_pps(moov_data):
     avcc_pos = moov_data.find(b'avcC')
@@ -87,11 +91,10 @@ def extract_frames(slack, slack_offset, sps_pps, output_h264_path):
 
                 end = start + 4 + size
                 if end > len(slack):
-                    logger.debug(f"슬랙 초과 frame @ (offset=0x{slack_offset + start:X}")
+                    logger.debug(f"슬랙 초과 frame @ offset=0x{slack_offset + start:X}")
                     continue
 
                 f.write(b'\x00\x00\x00\x01' + slack[start + 4:end])
-                #print(f"[{ftype}-Frame] @ offset 0x{slack_offset + start:X}, size={size}")
                 recovered += 1
             except (struct.error, IndexError):
                 continue
@@ -104,13 +107,15 @@ def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format
 
     filename = os.path.splitext(os.path.basename(filepath))[0]
     h264_path = os.path.join(output_h264_dir, f"{filename}_slack.h264")
-    mp4_path = os.path.join(output_video_dir, f"{filename}_slack.{target_format}")
+    mp4_path  = os.path.join(output_video_dir, f"{filename}_hidden.{target_format}")
 
     try:
         with open(filepath, 'rb') as f:
             data = f.read()
         
-        slack, slack_offset, moov_data = get_slack_after_moov(data)
+        slack, slack_offset, moov_data, slack_rate = get_slack_after_moov(data)
+        logger.info(f"{filename} → Slack rate: {slack_rate:.2f}%")
+        
         if slack_offset is None:
             logger.error(f"{filename} → moov 박스 없음 → 복원 불가")
             return {
@@ -118,8 +123,11 @@ def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format
                 "frame_count": 0,
                 "h264_path": None,
                 "output_path": None,
+                "video": None,
+                "recovered_slack_path": None,
+                "slack_rate": slack_rate
             }
-        # print(f"[INFO] 슬랙 영역 시작 offset: 0x{slack_offset:X}")
+        
         sps_pps = extract_sps_pps(moov_data)
         if not sps_pps:
             logger.info(f"{filename} → SPS/PPS 추출 실패 → 복원 불가")
@@ -128,35 +136,47 @@ def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format
                 "frame_count": 0,
                 "h264_path": None,
                 "output_path": None,
+                "video": None,
+                "recovered_slack_path": None,
+                "slack_rate": slack_rate
             }
+
         frame_count = extract_frames(slack, slack_offset, sps_pps, h264_path)
         logger.info(f"{filename} → 복구된 프레임 수: {frame_count}개")
 
         if frame_count > 0:
-            convert_video(h264_path, mp4_path, target_format)
+            convert_video(h264_path, mp4_path, extra_args=['-c:v', 'copy'])
             logger.info(f"{filename} → 영상 변환 완료: {mp4_path}")
             return {
                 "recovered": True,
                 "frame_count": frame_count,
                 "h264_path": h264_path,
                 "output_path": mp4_path,
+                "video": mp4_path,
+                "recovered_slack_path": mp4_path,
+                "slack_rate": slack_rate
             }
         else:
             if os.path.exists(h264_path):
                 os.remove(h264_path)
             logger.info(f"{filename} → 유효한 프레임 없음 (삭제됨)")
-                
             return {
                 "recovered": False,
                 "frame_count": 0,
                 "h264_path": h264_path,
                 "output_path": None,
+                "video": None,
+                "recovered_slack_path": mp4_path,
+                "slack_rate": slack_rate
             }
-    except Exception as e:
+    except Exception:
         logger.exception(f"{filename} 복원 중 예외 발생")
         return {
-            "recoverd": False,
+            "recovered": False,
             "frame_count": 0,
             "h264_path": None,
             "output_path": None,
+            "video": None,
+            "recovered_slack_path": None,
+            "slack_rate": None
         }

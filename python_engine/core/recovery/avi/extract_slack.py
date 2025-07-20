@@ -1,133 +1,196 @@
 import os
-import struct
 import logging
+from io import BytesIO
+from python_engine.core.recovery.avi.avi_split_channel import (
+    split_channel_bytes,
+    extract_full_channel_bytes,
+    CHUNK_SIG,
+    detect_codec)
 from python_engine.core.recovery.utils.ffmpeg_wrapper import convert_video
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
 logger = logging.getLogger(__name__)
 
-MAX_REASONABLE_CHUNK_SIZE = 10 * 1024 * 1024
-FRONT_SIGNATURE = b'00dc'
-REAR_SIGNATURE = b'01dc'
+def extract_sps_pps_from_raw(raw, codec, label):
+    # HEVC 여부 확장 판별
+    is_hevc = any(x in codec.lower() for x in ('265', 'hev1', 'hevc', 'hvc1'))
+    vps = sps = pps = b''
+    i = 0
 
-def extract_channel_from_slack(data, start_offset, signature):
-    offset = start_offset
-    end = len(data)
-    chunks = []
-    sps = pps = None
-    count = 0
+    def find_start(buf, start):
+        idx3 = buf.find(b'\x00\x00\x01', start)
+        idx4 = buf.find(b'\x00\x00\x00\x01', start)
+        candidates = [idx for idx in (idx3, idx4) if idx >= 0]
+        if not candidates:
+            return -1, 0
+        idx = min(candidates)
+        prefix = 4 if idx == idx4 else 3
+        return idx, prefix
 
-    while offset < end - 8:
-        index = data.find(signature, offset, end)
-        if index == -1 or index + 8 > end:
+    while True:
+        idx, prefix_len = find_start(raw, i)
+        if idx < 0:
+            break
+        nal_start = idx + prefix_len
+        next_idx, _ = find_start(raw, nal_start)
+        nal = raw[nal_start : next_idx if next_idx > 0 else len(raw)]
+        first = nal[0]
+
+        if is_hevc:
+            nal_type = (first >> 1) & 0x3F
+            if nal_type == 32:
+                vps = nal
+            elif nal_type == 33:
+                sps = nal
+            elif nal_type == 34:
+                pps = nal
+        else:
+            nal_type = first & 0x1F
+            if nal_type == 7:
+                sps = nal
+            elif nal_type == 8:
+                pps = nal
+
+        if (is_hevc and vps and sps and pps) or (not is_hevc and sps and pps):
             break
 
-        try:
-            size = struct.unpack('<I', data[index + 4: index + 8])[0]
-        except:
-            offset = index + 1
-            continue
+        i = nal_start
 
-        chunk_start = index + 8
-        chunk_end = chunk_start + size
-        aligned = size + (size % 2)
+    if is_hevc:
+        if not (vps and sps and pps):
+            logger.error(f"[{label}] raw에서 VPS/SPS/PPS를 못 찾음 (codec={codec})")
+            return b''
+        return b'\x00\x00\x00\x01' + vps + b'\x00\x00\x00\x01' + sps + b'\x00\x00\x00\x01' + pps
+    else:
+        if not (sps and pps):
+            logger.error(f"[{label}] raw에서 SPS/PPS를 못 찾음 (codec={codec})")
+            return b''
+        return b'\x00\x00\x00\x01' + sps + b'\x00\x00\x00\x01' + pps
 
-        # 프레임 크기 유효성 검사
-        if size > MAX_REASONABLE_CHUNK_SIZE:
-            logger.debug(f"비정상적으로 큰 프레임 (size={size}, offset=0x{index:X}) → skip")
-            offset = index + 4
-            continue
-        if size < 5:
-            logger.debug(f"너무 작은 프레임 (size={size}, offset=0x{index:X}) → skip")
-            offset = index + 4
-            continue
-        if chunk_end > end:
-            logger.debug(f"프레임이 파일 끝을 넘어감 (size={size}, offset=0x{index:X}) → skip")
-            offset = index + 4
-            continue
+def extract_frames_from_raw(raw, sps_pps, codec, out_fn):
+    if not sps_pps:
+        return 0
+    count = 0
+    # raw 앞에 SPS/PPS 헤더 붙이기
+    stream = sps_pps + raw
 
-        # NAL 검사
-        if data[chunk_start:chunk_start + 4] != b'\x00\x00\x00\x01':
-            logger.debug(f"잘못된 NAL prefix (offset=0x{index:X}) → skip")
-            offset = index + 4
-            continue
+    def find_start(buf, pos):
+        idx3 = buf.find(b'\x00\x00\x01', pos)
+        idx4 = buf.find(b'\x00\x00\x00\x01', pos)
+        candidates = [idx for idx in (idx3, idx4) if idx >= 0]
+        if not candidates:
+            return -1, 0
+        idx = min(candidates)
+        prefix = 4 if idx == idx4 else 3
+        return idx, prefix
 
-        nal_type = data[chunk_start + 4] & 0x1F
-        frame = data[chunk_start:chunk_end]
-
-        if nal_type == 7 and sps is None:
-            sps = frame
-        elif nal_type == 8 and pps is None:
-            pps = frame
-
-        if nal_type in (1, 5, 7, 8):
-            chunks.append(frame)
+    with open(out_fn, 'wb') as wf:
+        wf.write(sps_pps)
+        pos = 0
+        while True:
+            idx, prefix = find_start(stream, pos)
+            if idx < 0:
+                break
+            nal_start = idx + prefix
+            next_idx, _ = find_start(stream, nal_start)
+            nal = stream[nal_start : next_idx if next_idx > 0 else len(stream)]
+            # 모든 NAL unit 저장
+            wf.write((b'\x00\x00\x00\x01' if prefix == 4 else b'\x00\x00\x01') + nal)
             count += 1
+            pos = nal_start
+    return count
 
-        offset = index + 8 + aligned
-
-    return chunks, count, sps, pps
-
-def write_chunks(filepath, chunks, sps=None, pps=None):
-    with open(filepath, 'wb') as f:
-        if sps and pps:
-            f.write(sps)
-            f.write(pps)
-        for chunk in chunks:
-            f.write(chunk)
-
-def recover_avi_slack(filepath, output_h264_dir, output_video_dir, target_format="mp4"):
-    os.makedirs(output_h264_dir, exist_ok=True)
-    os.makedirs(output_video_dir, exist_ok=True)
-
-    filename = os.path.splitext(os.path.basename(filepath))[0]
-    with open(filepath, 'rb') as f:
+def recover_avi_slack(input_avi, raw_out_dir, slack_out_dir, channels_out_dir, target_format='mp4'):
+    with open(input_avi, "rb") as f:
         data = f.read()
+    
+    orig_codec = detect_codec(data)
+    
+    # 1) pre-check: front/rear/side 중 하나라도 프레임 있나?
+    counts = [ split_channel_bytes(data, lbl)[1] for lbl in ("front","rear","side") ]
+    if max(counts) == 0:
+        logger.info(f"{os.path.basename(input_avi)} → 실제 슬랙 프레임 없음, 복원 스킵")
+        return {}
 
-    try:
-        riff_size = struct.unpack('<I', data[4:8])[0]
-        slack_start = 8 + riff_size
-    except Exception as e:
-        logger.error(f"{filename} RIFF 파싱 실패 → 건너뜀: {e}")
-        return {
-            "front": {"recovered": False, "frame_count": 0, "output_path": None},
-            "rear": {"recovered": False, "frame_count": 0, "output_path": None}
+    os.makedirs(raw_out_dir, exist_ok=True)         # h264 슬랙 원본
+    os.makedirs(slack_out_dir, exist_ok=True)       # 슬랙만 MP4
+    os.makedirs(channels_out_dir, exist_ok=True)    # 전체 채널 MP4
+
+    basename = os.path.splitext(os.path.basename(input_avi))[0]
+    results = {}
+
+    # 2) 슬랙 hidden MP4 생성
+    for label in ("front","rear","side"):
+        logger.info(f"[SLP][{label}] 채널 분리 시작: {basename}")
+        channel_data, frame_count, codec = split_channel_bytes(data, label)
+        logger.info(f"{basename}_{label}: frame_count={frame_count}, codec={codec}")
+        
+        if frame_count == 0:
+            logger.info(f"[SLP][{label}] 프레임 없음 → 건너뜀")
+            continue
+
+        # SPS/PPS 추출
+        sps_pps = extract_sps_pps_from_raw(channel_data, codec, label)
+        if not sps_pps:
+            logger.warning(f"[{label}] SPS/PPS 실패 → 건너뜀")
+            continue
+
+        slack_h264 = os.path.join(raw_out_dir, f"{basename}_{label}_slack.h264")
+        slack_count = extract_frames_from_raw(channel_data, sps_pps, codec, slack_h264)
+        if slack_count == 0:
+            logger.info(f"[SLP][{label}] 슬랙 프레임 없음 → 삭제 및 건너뜀")
+            os.remove(slack_h264)
+            continue
+        logger.info(f"[SLP][{label}] 슬랙 프레임 추출 완료: {slack_count}개")
+
+        # hidden(slack) MP4 생성
+        hidden_mp4 = os.path.join(slack_out_dir, f"{basename}_{label}_hidden.mp4")
+        fmt = 'hevc' if any(x in orig_codec.lower() for x in ('265','hev1','hevc','hvc1')) else 'h264'
+        convert_video(
+            slack_h264, hidden_mp4,
+            extra_args=[
+                '-f', fmt,
+                '-c:v', 'copy',
+                '-movflags', 'faststart'
+            ]
+        )
+        logger.info(f"[RST][{label}] hidden MP4 생성: {hidden_mp4}")
+
+        results[label] = {
+            'recovered': True,
+            'hidden_path': hidden_mp4,
+            'frame_count': slack_count
         }
-    
-    result = {}
 
-    for label, sig in [('front', FRONT_SIGNATURE), ('rear', REAR_SIGNATURE)]:
-        chunks, count, sps, pps = extract_channel_from_slack(data, slack_start, sig)
-        h264_path = os.path.join(output_h264_dir, f"{filename}_slack_{label}.h264")
-        mp4_path = os.path.join(output_video_dir, f"{filename}_slack_{label}.{target_format}")
+    # 3) 원본 채널 MP4 생성
+    for label in ("front","rear","side"):
+        # 전체 채널 raw 데이터 획득
+        full_raw = extract_full_channel_bytes(data, label)
+        full_count = full_raw.count(CHUNK_SIG[label])
+        if full_count == 0:
+            logger.info(f"[FULL][{label}] 채널 없음 → 건너뜀")
+            continue
 
-        write_chunks(h264_path, chunks, sps, pps)
-        logger.info(f"{filename} → {label.upper()} 채널: {count}개 프레임 추출됨")
+        # raw 저장
+        raw_fn = os.path.join(raw_out_dir, f"{basename}_{label}.raw")
+        with open(raw_fn, 'wb') as rf:
+            rf.write(channel_data)
+        logger.info(f"[FULL][{label}] raw 저장: {raw_fn}")
 
-        if count > 0:
-            success = convert_video(h264_path, mp4_path, target_format)
-            result[label] = {
-                "recovered": success,
-                "frame_count": count,
-                "output_path": mp4_path if success else None
-            }
-            if success:
-                logger.info(f"{filename} → {label.upper()} 채널 복원 성공 → {mp4_path}")
-            else:
-                logger.warning(f"{filename} → {label.upper()} 채널 FFmpeg 변환 실패")
-        else:
-            if os.path.exists(h264_path):
-                os.remove(h264_path)
-            logger.info(f"{filename} → {label.upper()} 채널: 유효한 프레임 없음 (삭제됨)")
+        # 포맷 결정
+        fmt = 'hevc' if any(x in codec.lower() for x in ('265','hev1','hevc','hvc1')) else 'h264'
 
-            result[label] = {
-                "recovered": False,
-                "frame_count": 0,
-                "output_path": None
-            }
-    
-    return result
+        full_mp4 = os.path.join(channels_out_dir, f"{basename}_{label}.{target_format}")
+        convert_video(
+            raw_fn, full_mp4,
+            extra_args=[
+                '-f', fmt,
+                '-c:v', 'copy',
+                '-movflags', 'faststart'
+            ]
+        )
+        logger.info(f"[FULL][{label}] 변환 완료: {full_mp4}")
+
+        # 결과에도 기록
+        results[label].update(full_path=full_mp4)
+
+    return results
