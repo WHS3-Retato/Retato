@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 빌드 결과물
 /build/
 **/dist/
@@ -48,3 +49,29 @@ python_engine/sample_video/
 
 # 샘플 출력 결과물
 python_engine/sample_output/
+=======
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+>>>>>>> 180d45d (init: 프론트엔드 구조 및 UI 초안 커밋)

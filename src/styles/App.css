@@ -1,0 +1,9 @@
+.container {
+  display: flex;
+  height: 90vh;
+}
+
+.app_main {
+  flex-grow: 1;
+  background-color: #ECF2F8;
+}
