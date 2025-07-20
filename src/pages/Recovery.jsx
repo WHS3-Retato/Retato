@@ -65,7 +65,6 @@ const Recovery = () => {
 
   }, [progress]);
 
-
   const categoryIcons = {
     driving: drivingIcon,
     parking: parkingIcon,
@@ -331,7 +330,7 @@ const Recovery = () => {
           alignItems: 'center',
           flexDirection: 'column',
         }}>
-          <img src={completeIcon} alt="완료 아이콘" style={{ width: '100px', margin: '4rem 0' }} />
+          <img src={completeIcon} alt="완료 아이콘" style={{ width: '100px', margin: '3rem 0', marginTop:'5rem'}} />
         </div>
         <p style={{ textAlign: 'center', fontSize: '1rem' }}>
           선택된 경로에 복원된 영상이 저장되었습니다.
@@ -368,7 +367,6 @@ const Recovery = () => {
                 }}
               />
             </div>
-            <div className="progress-percent">{progress}%</div>
           </div>
         </>
   ) : !isRecovering && !recoveryDone ? (
@@ -409,13 +407,14 @@ const Recovery = () => {
         <h1 className="upload-title">Result</h1>
 
         <div className="recovery-file-box">
-          <div className="recovery-file-left">
-            <span className="file-name" style={{ marginRight: '20rem', display: 'inline-block' }} >{selectedAnalysisFile}</span>
-            <Badge label="전방" onClick={() => console.log('전방 선택')}/>
+          <span className="file-name">{selectedAnalysisFile}</span>
+          <div className="recovery-file-controls">
+            <Badge label="전방" onClick={() => console.log('전방 선택')} />
             <Badge label="후방" onClick={() => console.log('후방 클릭')} />
             <button className="close-btn" onClick={handleBack}>✕</button>
           </div>
         </div>
+
 
         <div className="result-scroll-area">
           {/* View */}

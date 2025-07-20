@@ -60,6 +60,16 @@
   margin-left: 1rem;
 }
 
+.recovery-desc-right {
+  display: flex;
+  justify-content: flex-end;
+  text-align: left;
+  font-size: 0.95rem;
+  color: #999;
+  margin-bottom: 1.5rem;
+  margin-right: 1rem;
+}
+
 .recovery-file-layout {
   display: flex;
   align-items: center;
@@ -67,22 +77,11 @@
   margin-bottom: 1.5rem;
 }
 
-.status-badge {
-  background-color: #e0edff;
-  width: 70px;
-  display: flex;
-  justify-content: center;
-  color: #0051b3;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
 
-.file-name {
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #222;
+.recovery-file-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .recovery-desc-center {
@@ -95,13 +94,14 @@
 
 .progress-bar-wrapper {
   width: 100%;
-  margin: 0 auto;
+  display: flex;
+  justify-content: center;
   margin-top: 2rem;
   position: relative;
 }
 
 .progress-bar-track {
-  width: 100%;
+  width: 90%;
   height: 12px;
   background: #eee;
   border-radius: 6px;
@@ -113,29 +113,6 @@
   background: #1e80ff;
   width: 0%;
   transition: width 0.6s ease;
-}
-
-.progress-percent {
-  text-align: right;
-  font-size: 0.85rem;
-  margin-top: 0.3rem;
-  color: #555;
-}
-
-.progress-image-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 6rem;
-  height: 60px; 
-  margin-bottom: 5rem;
-}
-
-.progress-text {
-  text-align: center;
-  font-size: 0.95rem;
-  color: #6b7280;
-  margin-bottom: 0.8rem;
 }
 
 .recovery-file-box {
@@ -158,16 +135,6 @@
   gap: 0.8rem;
 }
 
-.status-badge {
-  background-color: #e0edff;
-  width: 50px;
-  color: #0051b3;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-
 .file-name {
   font-size: 0.95rem;
   font-weight: 500;
@@ -188,34 +155,6 @@
 }
 
 /* Result-page */
-
-.result-title {
-  font-size: 1.8rem;
-  font-weight: 800;
-  margin-top: 1rem;
-  margin-left: 1rem;
-}
-
-.result-topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 1.5rem 1rem;
-}
-
-.result-topbar-input {
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  border: 1px solid #ccc;
-  font-weight: bold;
-}
-
-.result-topbar-check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
 
 .result-group {
   margin: 1rem 0;
@@ -280,44 +219,9 @@
   display: block;
 }
 
-.result-download-btn {
-  margin-top: 2rem;
-  float: right;
-  background: #111827;
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.6rem 1.5rem;
-  font-weight: bold;
-  cursor: pointer;
-  margin-right: 1rem;
-}
+
 
 /* Download */
-
-.download-box {
-  background: #fff;
-  padding: 2rem;
-  border-radius: 1.2rem;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
-  max-width: 520px;
-  margin: 2rem auto;
-  font-family: "Noto Sans KR", sans-serif;
-}
-
-.download-title {
-  font-size: 1.5rem;
-  font-weight: 800;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.download-title::before {
-  content: "📁";
-  font-size: 1.6rem;
-}
 
 .download-options label {
   display: flex;
@@ -342,31 +246,6 @@
   background-color: #f9f9f9;
 }
 
-.folder-btn {
-  background: #e5e5e5;
-  border: none;
-  border-radius: 0.5rem;
-  font-size: 1.2rem;
-  padding: 0.4rem 0.6rem;
-  cursor: pointer;
-}
-
-.option-box {
-  background-color: #f0f4ff;
-  width: 200px;
-  border-left: 4px solid #3366ff;
-  padding: 0.75rem 1rem;
-  font-size: 0.95rem;
-  color: #333;
-  margin-bottom: 1.5rem;
-  border-radius: 0.5rem;
-}
-
-.bottom-btns {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-}
 
 .result-scroll-area {
   max-height: 400px; /* 원하는 높이로 조정 (예: 400~500px) */
@@ -376,24 +255,6 @@
 
 .result-wrapper {
   margin: 1rem; 
-}
-
-
-.select-location-popup {
-  width: 360px;   /* 기존보다 넓게 */
-  max-width: 100%;
-}
-
-.select-location-popup .download-options {
-  font-size: 0.95rem;
-  line-height: 1.8;
-}
-
-.select-location-popup input[type="text"] {
-  width: 100%;
-  margin-top: 0.5rem;
-  padding: 0.6rem;
-  font-size: 0.9rem;
 }
 
 .text-button {
@@ -590,4 +451,3 @@
   font-weight: bold;
   color: #333;
 }
-
