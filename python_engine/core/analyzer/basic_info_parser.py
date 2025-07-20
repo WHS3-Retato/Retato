@@ -4,6 +4,8 @@ import subprocess
 import json
 from fractions import Fraction
 
+FFPROBE_PATH = r"E:\Retato\bin\ffprobe.exe"
+
 def file_format(file_path):
     with open(file_path, 'rb') as f:
         header = f.read(12)
@@ -19,20 +21,19 @@ def file_format(file_path):
     return 'Unknown'
 
 def file_creation_time(file_path):
-    created_timestamp = os.path.getctime(file_path)
-    modified_timestamp = os.path.getmtime(file_path)
-    access_timestamp = os.path.getatime(file_path)
+    created = os.path.getctime(file_path)
+    modified = os.path.getmtime(file_path)
+    accessed = os.path.getatime(file_path)
 
-    # 사람이 읽을 수 있는 형태로 변환
-    creation_time = datetime.datetime.fromtimestamp(created_timestamp)
-    modified_time = datetime.datetime.fromtimestamp(modified_timestamp)
-    access_time = datetime.datetime.fromtimestamp(access_timestamp)
-    
-    return creation_time, modified_time, access_time
+    return {
+        "created": datetime.datetime.fromtimestamp(created).strftime('%Y-%m-%d %H:%M:%S'),
+        "modified": datetime.datetime.fromtimestamp(modified).strftime('%Y-%m-%d %H:%M:%S'),
+        "accessed": datetime.datetime.fromtimestamp(accessed).strftime('%Y-%m-%d %H:%M:%S')
+    }
 
 def video_metadata(file_path):
     cmd = [
-        'ffprobe',
+        FFPROBE_PATH,
         '-v', 'error',
         '-select_streams', 'v:0',
         '-show_entries', 'stream=codec_name,width,height,r_frame_rate,duration',
@@ -41,24 +42,23 @@ def video_metadata(file_path):
     ]
 
     try:
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True
+        )
         info = json.loads(result.stdout)
 
-        streams = info.get('streams', [])  # Resolve: KeyError 방지
-        if not streams:
-            raise ValueError("스트림 정보가 없습니다.")  # Resolve: IndexError 방지
-
-        stream = streams[0]
-        codec = stream.get('codec_name', 'unknown')
-        width = int(stream.get('width', 0))
-        height = int(stream.get('height', 0))
+        stream = info.get('streams', [{}])[0]
+        codec    = stream.get('codec_name', 'unknown')
+        width    = int(stream.get('width', 0))
+        height   = int(stream.get('height', 0))
         duration = float(stream.get('duration', 0.0))
 
-        fps_str = stream.get('r_frame_rate', '0/1')
-        try:
-            frame_rate = float(Fraction(fps_str))  # Resolve: eval() 제거 → 안전한 방식으로 대체
-        except:
-            frame_rate = 0.0
+        fps_str    = stream.get('r_frame_rate', '0/1')
+        frame_rate = float(Fraction(fps_str)) if fps_str != '0/0' else 0.0
 
         return {
             'duration': duration,
@@ -68,8 +68,8 @@ def video_metadata(file_path):
             'frame_rate': frame_rate
         }
 
-    except Exception as e:
-        print(f"[오류] 메타데이터 추출 실패: {e}")
+    except Exception:
+        # ffprobe 실행 실패 시 기본값 반환
         return {
             'duration': 0.0,
             'codec': 'unknown',
@@ -81,3 +81,11 @@ def video_metadata(file_path):
 def file_size(file_path):
     # 파일 크기 (bytes 단위) 반환
     return os.path.getsize(file_path)
+
+def get_basic_info(file_path):
+    return {
+        "format": file_format(file_path),
+        "file_size": file_size(file_path),
+        "timestamps": file_creation_time(file_path),
+        "video_metadata": video_metadata(file_path)
+    }
