@@ -86,6 +86,7 @@
 }
 
 .recovery-desc-center {
+  margin-top: 0.5rem;
   text-align: center;
   font-size: 0.95rem;
   color: #aaa;
@@ -265,6 +266,7 @@
   width: 20px;
   height: 20px;
   margin-top: 0.2rem;
+  margin-left: 2rem;
 }
 
 .result-file-info {
@@ -315,14 +317,6 @@
 .download-title::before {
   content: "📁";
   font-size: 1.6rem;
-}
-
-.download-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-bottom: 1.2rem;
-  font-size: 1rem;
 }
 
 .download-options label {
@@ -379,6 +373,11 @@
   overflow-y: auto;
   padding-right: 0.5rem; /* 스크롤바 공간 */
 }
+
+.result-wrapper {
+  margin: 1rem; 
+}
+
 
 .select-location-popup {
   width: 360px;   /* 기존보다 넓게 */

@@ -1,14 +1,13 @@
 import React from 'react';
 import '../styles/Information.css';
 
-
 const Information = () => {
   return (
     <div className="info_page">
       <h1 className="info_title">Information</h1>
       {/* 소프트웨어 정보 */}
       <div className="info_box">
-        <h1>소프트웨어 정보</h1>
+        <h1>  소프트웨어 정보</h1>
         <table className="info_table">
           <tbody>
             <tr>
@@ -29,7 +28,7 @@ const Information = () => {
 
       {/* 개발자 정보 */}
       <div className="info_box">
-        <h1>개발자 정보</h1>
+        <h1>  개발자 정보</h1>
         <table className="info_table">
           <tbody>
             <tr>
@@ -50,7 +49,7 @@ const Information = () => {
 
       {/* 기술 스택 */}
       <div className="info_box">
-        <h1>기술 스택</h1>
+        <h1>  기술 스택</h1>
         <div className="tech_stack">
           <div><strong>프론트엔드</strong> <span className="tag">Electron</span> <span className="tag">React</span> <span className="tag">JavaScript</span></div>
           <div><strong>백엔드</strong> <span className="tag">Python</span> <span className="tag">Node.js</span></div>

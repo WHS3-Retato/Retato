@@ -5,13 +5,12 @@ import Box from '../components/Box.jsx';
 import Button from '../components/Button.jsx';
 import Alert from '../components/Alert.jsx';
 import Badge from '../components/Badge.jsx';
+import Potato from '../components/Potato.jsx';
 import '../styles/Stepbar.css';  
 import '../styles/Recovery.css'; 
 import '../styles/Button.css';
 import '../styles/Alert.css';
 import alertIcon from '../images/alert_file.svg';
-import alertRangeIcon from '../images/alert_range.svg';
-import progressImg from '../images/progress.svg';
 import drivingIcon from '../images/driving.svg';
 import parkingIcon from '../images/parking.svg';
 import eventIcon from '../images/event.svg';
@@ -35,7 +34,6 @@ const Recovery = () => {
   const inputRef = useRef(null);
 
   const [showAlert, setShowAlert] = useState(false);
-  const [showRange, setShowRange] = useState(false);
   const [recoveryDone, setRecoveryDone] = useState(false);
   const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
@@ -47,8 +45,8 @@ const Recovery = () => {
   const [currentCount, setCurrentCount] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
 
-  const [selectedAnalysisFile, setSelectedAnalysisFile] = useState(null); // 선택된 파일 이름
-  const [activeTab, setActiveTab] = useState('basic'); // 현재 선택된 탭
+  const [selectedAnalysisFile, setSelectedAnalysisFile] = useState(null); 
+  const [activeTab, setActiveTab] = useState('basic');
   const [showComplete, setShowComplete] = useState(false);
   const [showDownloadAlert, setShowDownloadAlert] = useState(false);
   
@@ -110,12 +108,13 @@ const Recovery = () => {
 
     setSelectedFile(file);
     setShowAlert(false);
-    setShowRange(true);
-
-    if (window.api?.sendFilePath) {
-      window.api.sendFilePath(file.path);
-    }
+    
+    setIsRecovering(true);
+    setCurrentCount(0);
+    setProgress(0);
+    setTotalFiles(300);
   };
+
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -172,27 +171,6 @@ const Recovery = () => {
     setShowAlert(true);
   };
 
-  const startRecoveryFromRange = () => {
-  setAutoStart(false); 
-  setShowRange(false);
-  setIsRecovering(true);
-  setCurrentCount(0);
-  setProgress(0);
-  setTotalFiles(300);
-  };
-
-  const handleRangeCancel = () => {
-  setShowRange(false);  
-  };
-
-  const handleRangeConfirm = () => {
-    setShowRange(false);
-    setIsRecovering(true);
-    setCurrentCount(0);
-    setProgress(0);
-    setTotalFiles(300); // 하드코딩 값
-  };
-
   const handleDownloadClick = () => {
     setShowDownloadPopup(true);
   };
@@ -221,6 +199,13 @@ const Recovery = () => {
     setView('parser');            
   };
 
+  const handlePathSelect = async () => {
+    const result = await window.api.selectFolder();  // api로 접근
+    if (result && !result.canceled && result.filePaths.length > 0) {
+      setSelectedPath(result.filePaths[0]);  // 경로 반영
+    }
+  };
+
   // Stepbar currentStep
   let currentStep = 0;
 
@@ -244,7 +229,7 @@ const Recovery = () => {
   const progressBar = document.getElementById('progressBar');
   const timeText = document.getElementById('timeText');
 
-  if (!video) return; // 존재하지 않으면 중단
+  if (!video) return;
 
   playPauseBtn.onclick = () => {
     if (video.paused) {
@@ -308,7 +293,6 @@ const Recovery = () => {
       setHistory(newHistory);
       setView(prevView);
 
-      // ✅ 추가: 상태도 prevView에 맞게 복원
       if (prevView === 'upload') {
         setIsRecovering(false);
         setRecoveryDone(false);
@@ -328,7 +312,6 @@ const Recovery = () => {
         setIsRecovering(false);
         setRecoveryDone(true);
         setShowComplete(false);
-        // selectedAnalysisFile 유지
       }
     }
   };
@@ -370,8 +353,8 @@ const Recovery = () => {
               </div>
               <button className="close-btn" onClick={() => setIsRecovering(false)}>✕</button>
               </div>
-                <div className="progress-image-wrapper">
-                <img src={progressImg} alt="Progress Icon" style={{ width: '90px', height: '90px' }} />
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <Potato />
               </div>
           <div className="recovery-desc-center">Recovering...</div>
 
@@ -628,6 +611,7 @@ const Recovery = () => {
       <>
         {/* 분석 후 바로 나오는 화면 */}
         <h1 className="upload-title">Result</h1>
+        <div class="result-wrapper">
         <p className="result-summary">총 5개의 파일, 용량: 5.4GB</p>
 
         <div className="result-scroll-area">
@@ -670,8 +654,9 @@ const Recovery = () => {
           ))}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginRight:'2rem' }}>
           <Button variant="dark" onClick={handleDownload}>다운로드</Button>
+        </div>
         </div>
       </>
     )
@@ -694,58 +679,28 @@ const Recovery = () => {
         <Button variant="dark" onClick={() => setShowAlert(false)}>다시 선택</Button>
       </Alert>
     )}
-    {showRange && (
-      <Alert
-        icon={alertRangeIcon}
-        title="추출 범위 선택"
-        description="어떤 영상을 대상으로 추출할지 선택하세요"
-      >
-        <div>
-          <label>
-            <input type="radio" name="range" value="all" />
-            전체 영상
-          </label>
-          <br />
-          <label>
-            <input type="radio" name="range" value="slack" defaultChecked />
-            슬랙 영상이 포함된 영상만
-          </label>
-        </div>
-        <div
-          className="alert-buttons"
-          style={{ marginTop: '1rem', display: 'flex', gap: '10px' }}
-        >
-          <Button variant="gray" onClick={handleRangeCancel}>이전</Button>
-          <Button variant="dark" onClick={startRecoveryFromRange}>완료</Button>
-        </div>
-      </Alert>
-      )}
     
     {showDownloadPopup && (
       <Alert
         icon={downloadIcon}
-        title="저장 위치 선택"
+        title="다운로드 옵션"
         description={
           <>
             <div className="download-popup-wide">
+              복원 결과물을 이미지(jpeg) 형식으로도 저장하시겠습니까?<br />  <br />
               <div className="download-options">
-                <label><input type="radio" name="path" value="desktop" /> 바탕화면</label>
-                <label><input type="radio" name="path" value="downloads" /> 다운로드 폴더</label>
-                <label><input type="radio" name="path" value="documents" /> 문서 폴더</label>
-                <label><input type="radio" name="path" value="custom" defaultChecked /> 사용자 지정 위치</label>
+                <label><input type="radio" name="path" value="desktop" />Y</label>
+                <label><input type="radio" name="path" value="downloads" /> N </label><br />   <br />   
               </div>
-
-              <div className="path-box" style={{ display: 'flex', marginTop: '1rem' }}>
+              <div className="path-box" style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
                 <input
                   type="text"
                   value={selectedPath}
                   readOnly
                   className="custom-path-input"
+                  style={{ flex: 1 }}
                 />
-              </div>
-
-              <div className="option-box">
-                선택된 옵션:<br />• 이미지 파일 포함
+                <Button variant="gray" onClick={handlePathSelect}>경로 지정</Button><br />   
               </div>
             </div>
           </>

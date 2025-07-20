@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron'); // ✅ 한 줄에 다 합침
 const path = require('path');
 const drivelist = require('drivelist');
 const checkDiskSpace = require('check-disk-space').default;
@@ -147,7 +147,14 @@ ipcMain.handle('read-folder', async (_event, folderPath) => {
 });
 
 ipcMain.on('file-selected', (_event, filePath) => {
-  console.log('📂 선택된 E01 파일 경로:', filePath);
+  console.log('선택된 E01 파일 경로:', filePath);
 
-  // TODO: 이후 분석기로 넘기거나 상태 저장, 전역 변수 할당 등 추가 가능
+});
+
+
+ipcMain.handle('dialog:openDirectory', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory']  
+  });
+  return result;
 });
