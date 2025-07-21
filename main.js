@@ -1,5 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron'); // ✅ 한 줄에 다 합침
 const path = require('path');
+const { spawn } = require('child_process');
+const readline = require('readline');
 const drivelist = require('drivelist');
 const checkDiskSpace = require('check-disk-space').default;
 const fs = require('fs').promises;
@@ -148,13 +150,63 @@ ipcMain.handle('read-folder', async (_event, folderPath) => {
 
 ipcMain.on('file-selected', (_event, filePath) => {
   console.log('선택된 E01 파일 경로:', filePath);
-
 });
 
+ipcMain.handle('start-recovery', (_event, e01FilePath) => {
+  console.log('▶ start-recovery called with', e01FilePath);
+
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(
+      __dirname, 'python_engine', 'core', 'image_loader', 'e01_parser.py'
+    );
+    const env = { ...process.env, PYTHONPATH: __dirname };
+    const python = spawn('python', [scriptPath, e01FilePath], {
+      cwd: __dirname,
+      shell: true,
+      env,
+    });
+
+    console.log('--- Python spawned, waiting for stdout lines ---');
+
+    const rl = readline.createInterface({ input: python.stdout });
+    rl.on('line', line => {
+      console.log('⭸ raw line:', line);
+      try {
+        const { processed, total } = JSON.parse(line);
+        console.log('✔ parsed:', processed, total);
+        mainWindow.webContents.send('recovery-progress', { processed, total });
+      } catch (e) {
+        console.log('⚠️ not JSON:', line);
+      }
+    });
+
+    python.stderr.on('data', buf => {
+      console.error('Python stderr:', buf.toString());
+      mainWindow.webContents.send('recovery-error', buf.toString());
+    });
+
+    python.on('close', code => {
+      console.log('🔚 python exited with code', code);
+      rl.close();
+      mainWindow.webContents.send('recovery-done');
+      code === 0 ? resolve() : reject(new Error(`exit ${code}`));
+    });
+  });
+});
 
 ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory']  
   });
   return result;
+});
+
+ipcMain.handle('dialog:openE01File', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'E01 파일 선택',
+    filters: [{ name: 'E01 files', extensions: ['e01'] }],
+    properties: ['openFile']
+  });
+  // 선택 취소 시 []
+  return result.canceled ? null : result.filePaths[0];
 });

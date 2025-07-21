@@ -73,46 +73,44 @@ const Recovery = () => {
     deleted: deletedIcon,
   };
 
-  // Progress Bar, 나중에 백엔드 연동 예정
+  // 메인에서 progress/done 이벤트 받아오기
   useEffect(() => {
-  if (isRecovering) {
-    const interval = setInterval(() => {
-      setCurrentCount((prev) => {
-        const next = prev + 100;
-        const newProgress = Math.floor((next / 300) * 100); // 총 300개로 가정
+    console.log('📡 onProgress useEffect mounted');
+    const offProg = window.api.onProgress(({ processed, total }) => {
+      console.log('📈 progress event', processed, total);
+      setTotalFiles(total);
+      setProgress(Math.floor((processed / total) * 100));
+  });
+  const offDone = window.api.onDone(() => {
+    console.log('✅ recovery done event');
+    setProgress(100);
+    setIsRecovering(false);
+    setRecoveryDone(true);
+  });
+  return () => { offProg(); offDone(); };
+}, []);
 
-        setProgress(newProgress);
-
-        if (newProgress >= 100) {
-          clearInterval(interval);
-          setProgress(100);
-          setIsRecovering(false);   
-          setRecoveryDone(true);    
-        }
-
-        return next;
-      });
-    }, 8000);
-
-    return () => clearInterval(interval);
-  }
-}, [isRecovering]);
-
-
-  const handleFile = (file) => {
-    if (!file.name.toLowerCase().endsWith('.e01')) {
-      setShowAlert(true);
-      return;
+  // isRecovering가 true가 되면 startRecovery 호출
+  useEffect(() => {
+    if (isRecovering && selectedFile) {
+      window.api.startRecovery(selectedFile.path);
     }
+  }, [isRecovering, selectedFile]);
 
-    setSelectedFile(file);
-    setShowAlert(false);
-    
-    setIsRecovering(true);
-    setCurrentCount(0);
-    setProgress(0);
-    setTotalFiles(300);
-  };
+  const handleFile = file => {
+  if (!file.name.toLowerCase().endsWith('.e01')) {
+    setShowAlert(true);
+    return;
+  }
+  setSelectedFile(file);
+  setShowAlert(false);
+  setIsRecovering(true);
+  setRecoveryDone(false);
+  setProgress(0);
+  setTotalFiles(0);
+  // 직접 호출해 버려도 OK
+  window.api.startRecovery(file.path);
+};
 
 
   const handleDrop = (e) => {
@@ -126,8 +124,13 @@ const Recovery = () => {
     if (file) handleFile(file);
   };
 
-  const handleClick = () => {
-    inputRef.current.click();
+  const handleClick = async () => {
+    const filePath = await window.api.openE01File();
+    if (filePath) {
+      const parts = filePath.split(/[/\\]/);
+      const fileName = parts[parts.length - 1];
+      handleFile({ path: filePath, name: fileName });
+    }
   };
 
   const startRecovery = () => {
@@ -208,7 +211,7 @@ const Recovery = () => {
   // Stepbar currentStep
   let currentStep = 0;
 
-  if (showComplete) {
+  if (recoveryDone) {
     currentStep = 3;
   } else if (isRecovering) {
     currentStep = 1;
