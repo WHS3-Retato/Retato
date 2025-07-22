@@ -9,7 +9,7 @@ export default defineConfig({
     rollupOptions: {
       external: ['electron'],
     },
-    emptyOutDir: false,  
+    emptyOutDir: false,
   },
   resolve: {
     alias: {

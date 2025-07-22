@@ -32,4 +32,10 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('recovery-done', listener);
     return () => ipcRenderer.removeListener('recovery-done', listener);
   },
+
+  onResults: (callback) => {
+    const listener = (_e, data) => callback(data);
+    ipcRenderer.on('recovery-results', listener);
+    return () => ipcRenderer.removeListener('results', listener);
+  },
 });

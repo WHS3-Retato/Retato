@@ -158,6 +158,7 @@ def extract_video_files(fs_info, output_dir, path="/", total_count=None, progres
                 'name': name,
                 'path': filepath,
                 'size': size,
+                'origin_video': orig_path,
                 'slack_info': slack_info,
                 'analysis': analysis
             })
@@ -201,6 +202,7 @@ def extract_video_files(fs_info, output_dir, path="/", total_count=None, progres
             'name': name,
             'path': filepath,
             'size': size,
+            'origin_video': orig_path,
             'channels': avi_info
         })
 
@@ -210,18 +212,11 @@ def extract_video_files(fs_info, output_dir, path="/", total_count=None, progres
 
     return results
 
-def extract_videos_from_e01():
+def extract_videos_from_e01(e01_path):
     start_time = time.time()
 
-    # ① Electron(start-recovery)에서 넘겨준 CLI 인자가 있으면 사용
-    if len(sys.argv) >= 2 and sys.argv[1]:
-        img_path = sys.argv[1]
-        logger.info(f"▶ CLI 인자로 받은 E01 파일: {img_path}")
-    else:
-        # ② CLI 인자 없으면 GUI 대화상자 띄우기
-        logger.info("▶ 파일 인자 없으므로 대화상자 열기")
-        print("이미지 파일(.E01 또는 .001)을 선택해주세요.")
-        img_path = select_image_file()
+    img_path = e01_path
+    logger.info(f"▶ 분석용 E01 파일: {img_path}")
 
     if not img_path:
         print("E01 파일을 선택하지 않았습니다. 종료합니다.")
@@ -269,7 +264,3 @@ def extract_videos_from_e01():
 
     # 파티션이 하나도 없을 경우
     return res, output_dir, total
-
-if __name__ == "__main__":
-    # 실제 복구 루틴 실행
-    res, output_dir, total = extract_videos_from_e01()
