@@ -64,6 +64,9 @@ def get_integrity_info(file_path):
         elif ftyp_offset != 0:
             result["damaged"] = True
             result["reasons"].append(f"[구조 손상] 'ftyp' 위치 이상: offset={ftyp_offset}")
+        elif ftyp_size == 0:
+            result["damaged"] = True
+            result["reasons"].append("[필수 atom 손상] 'ftyp' box 사이즈 누락")
 
         # moov 박스 검증
         moov_offset, moov_size = find_box(data, 'moov')

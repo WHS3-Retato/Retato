@@ -12,9 +12,12 @@ const Settings = ({ isDarkMode, setIsDarkMode }) => {
 
   const [showCacheMessage, setShowCacheMessage] = useState(false);
 
-  const handleCacheClear = () => {
+  const handleCacheClear = async () => {
+    if (window.api?.clearCache) {
+      await window.api.clearCache();
+    }
     setShowCacheMessage(true);
-    setTimeout(() => setShowCacheMessage(false), 4000); // 4초 후 메시지 숨김
+    setTimeout(() => setShowCacheMessage(false), 4000);
   };
 
   return (

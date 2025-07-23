@@ -51,18 +51,7 @@ const Recovery = () => {
   const [results, setResults] = useState([]);
   const [openGroups, setOpenGroups] = useState({});
 
-  const [slackVideoSrc, setSlackVideoSrc] = useState('');
-
-  // results 상태 변경 감지
-  useEffect(() => {
-    console.log('📊 [FRONTEND] Results 상태 업데이트됨!');
-    console.log('📊 [FRONTEND] Results 길이:', results.length);
-    results.forEach((result, index) => {
-      const slackRate = result.slack_info?.slack_rate;
-      const displayRate = slackRate !== null && slackRate !== undefined ? slackRate : 'N/A';
-      console.log(`📊 [FRONTEND] Result ${index + 1}: ${result.name} - Slack Rate: ${displayRate}`);
-    });
-  }, [results]);
+  const [tempOutputDir, setTempOutputDir] = useState(null);
 
   function groupByCategory(list) {
     return list.reduce((acc, file) => {
@@ -72,7 +61,7 @@ const Recovery = () => {
       return acc
     }, {})
   }
-  const groupedResults = useMemo(() => groupByCategory(results), [results])
+  const groupedResults = useMemo(() => groupByCategory(results), [results])``
 
   const [selectedAnalysisFile, setSelectedAnalysisFile] = useState(null);
   const [activeTab, setActiveTab] = useState('basic');
@@ -82,6 +71,8 @@ const Recovery = () => {
   const location = useLocation();
   const initialFile = location.state?.e01File || null;
   const autoStart = location.state?.autoStart || false;
+
+  const [slackVideoSrc, setSlackVideoSrc] = useState('');
 
   // 바이트 → MB 변환
   const bytesToMB = (bytes) => (bytes / 1024 / 1024).toFixed(1) + ' MB';
@@ -149,6 +140,7 @@ const Recovery = () => {
     // prefix 기본 매핑
     const prefix = Object.keys(categoryIcons).find((k) =>
       cat.startsWith(k)
+
     );
     return prefix ? categoryIcons[prefix] : slackIcon;
   };
@@ -157,12 +149,12 @@ const Recovery = () => {
   useEffect(() => {
     console.log('📡 onProgress useEffect mounted');
     const offProg = window.api.onProgress(({ processed, total }) => {
-      console.log('📈 [FRONTEND] progress event - processed:', processed, 'total:', total);
+      console.log('📈 progress event', processed, total);
       setTotalFiles(total);
       setProgress(Math.floor((processed / total) * 100));
     });
     const offDone = window.api.onDone(() => {
-      console.log('✅ [FRONTEND] recovery done event');
+      console.log('✅ recovery done event');
       setProgress(100);
       setIsRecovering(false);
       setRecoveryDone(true);
@@ -173,57 +165,37 @@ const Recovery = () => {
   useEffect(() => {
     console.log('📡 onResults listener registered')
     const off = window.api.onResults(data => {
-      console.log('📥 [FRONTEND] =========================== 데이터 수신 ===========================');
-      console.log('📥 [FRONTEND] onResults 받은 전체 데이터:', data);
-      console.log('📥 [FRONTEND] 데이터 타입:', typeof data);
-      console.log('📥 [FRONTEND] 배열 여부:', Array.isArray(data));
-
-      if (Array.isArray(data)) {
-        console.log('📥 [FRONTEND] 총 파일 개수:', data.length);
-        console.log('📥 [FRONTEND] ==================== 각 파일별 상세 정보 ====================');
-
-        data.forEach((item, index) => {
-          console.log(`📥 [FRONTEND] ========== 파일 ${index + 1} ==========`);
-          console.log(`📥 [FRONTEND] 파일명: ${item.name}`);
-          console.log(`📥 [FRONTEND] 경로: ${item.path}`);
-          console.log(`📥 [FRONTEND] 크기: ${item.size} bytes`);
-
-          if (item.slack_info) {
-            console.log(`📥 [FRONTEND] 🔥 SLACK INFO 존재!`);
-            console.log(`📥 [FRONTEND] 🔥 Slack Rate: ${item.slack_info.slack_rate}`);
-            console.log(`📥 [FRONTEND] 🔥 Slack Info 전체:`, item.slack_info);
-          } else {
-            console.log(`📥 [FRONTEND] ⚠️ SLACK INFO 없음!`);
-          }
-
-          if (item.analysis) {
-            console.log(`📥 [FRONTEND] Analysis 존재:`, Object.keys(item.analysis));
-          } else {
-            console.log(`📥 [FRONTEND] Analysis 없음`);
-          }
-
-          console.log(`📥 [FRONTEND] 전체 항목 ${index + 1}:`, JSON.stringify(item, null, 2));
-        });
-      } else if (data.error) {
-        console.error('📥 [FRONTEND] 에러 받음:', data.error);
-        setResultError(data.error);
-      } else {
-        console.log('📥 [FRONTEND] 단일 객체:', JSON.stringify(data, null, 2));
-      }
-
+      console.log('📥 [Debug] onResults data:', data)
       if (data.error) setResultError(data.error);
       else setResults(data);
     });
     return off;
   }, []);
 
-  // onAnalysisPath, onDownloadLog, onDownloadError 리스너들은 
-  // preload.js에 정의되어 있지 않고 실제로 사용되지 않으므로 제거됨
+  useEffect(() => {
+    const offPath = window.api.onAnalysisPath(path => {
+      console.log('analysisPath:', path);
+      setTempOutputDir(path);
+    });
+    return () => offPath();
+  }, []);
+
+  useEffect(() => {
+    const offLog = window.api.onDownloadLog(line => {
+      console.log('다운로드 로그:', line);
+    });
+    const offErr = window.api.onDownloadError(err => {
+      console.error('다운로드 에러:', err);
+    });
+    return () => {
+      offLog();
+      offErr();
+    };
+  }, []);
 
   // isRecovering가 true가 되면 startRecovery 호출
   useEffect(() => {
     if (isRecovering && selectedFile) {
-      console.log('🚀 [FRONTEND] startRecovery 호출 - 파일 경로:', selectedFile.path);
       window.api.startRecovery(selectedFile.path);
     }
   }, [isRecovering, selectedFile]);
@@ -300,14 +272,16 @@ const Recovery = () => {
   };
 
   const handleFolderSelect = async () => {
-    const path = await window.electronAPI.selectFolder();
-    if (path) setSelectedPath(path);
+    const result = await window.api.openDirectory();
+    if (!result.canceled && result.filePaths.length > 0) {
+      setSelectedPath(result.filePaths[0]);
+    }
   };
 
   // 다운로드 백엔드
   const handleDownloadConfirm = async () => {
-    if (!selectedFile || !selectedPath) {
-      alert('다운로드 경로 또는 E01 파일이 선택되지 않았습니다.');
+    if (!selectedFile || !tempOutputDir || !selectedPath) {
+      alert('다운로드 경로 또는 임시 폴더가 올바르지 않습니다.');
       return;
     }
 
@@ -315,7 +289,7 @@ const Recovery = () => {
 
     try {
       await window.api.runDownload({
-        e01Path: selectedFile,
+        e01Path: tempOutputDir,
         choice,
         downloadDir: selectedPath
       });
@@ -340,17 +314,9 @@ const Recovery = () => {
   };
 
   const handlePathSelect = async () => {
-    const result = await window.api.selectFolder();  // api로 접근
-    let dir;
-
-    if (result && !result.canceled && result.filePaths.length > 0) {
-      dir = result.filePaths[0];
-    } else {
-      dir = await window.api.invoke('select-download-dir');
-    }
-
-    if (dir) {
-      setSelectedPath(dir);
+    const result = await window.api.openDirectory();
+    if (!result.canceled && result.filePaths.length > 0) {
+      setSelectedPath(result.filePaths[0]);
     }
   };
 
@@ -420,7 +386,25 @@ const Recovery = () => {
           playPauseIcon.src = 'view_play.svg';
         }
       };
+      playPauseBtn.onclick = () => {
+        if (video.paused) {
+          video.play();
+          playPauseIcon.style.filter = 'none';
+        } else {
+          video.pause();
+          playPauseIcon.style.filter = 'grayscale(100%) brightness(0.8)';
+        }
+      };
 
+      replayBtn.onclick = () => {
+        video.currentTime = 0;
+        video.play();
+        playPauseIcon.style.filter = 'none';
+      };
+
+      fullscreenBtn.onclick = () => {
+        if (video.requestFullscreen) video.requestFullscreen();
+      };
       replayBtn.onclick = () => {
         video.currentTime = 0;
         video.play();
@@ -510,7 +494,7 @@ const Recovery = () => {
                 alignItems: 'center',
                 flexDirection: 'column',
               }}>
-                <img src={completeIcon} alt="완료 아이콘" style={{ width: '100px', margin: '3rem 0', marginTop: '5rem' }} />
+                <img src={completeIcon} alt="완료 아이콘" style={{ width: '100px', margin: '3rem 0', marginTop: '6rem' }} />
               </div>
               <p style={{ textAlign: 'center', fontSize: '1rem' }}>
                 선택된 경로에 복원된 영상이 저장되었습니다.
@@ -862,7 +846,7 @@ const Recovery = () => {
                                     )}
                                   </div>
                                   <br />
-                                  {mb} MB ・ 슬랙비율 {slackRatePercent} %
+                                  {mb} ・ 슬랙비율: {slackRatePercent} %
                                 </div>
                               </div>
                             )
@@ -892,6 +876,7 @@ const Recovery = () => {
         ) : null
         }
       </Box>
+
       {showAlert && (
         <Alert
           icon={alertIcon}
@@ -941,6 +926,7 @@ const Recovery = () => {
           />
         </div>
       )}
+
 
       {showDownloadPopup && (
         <Alert
