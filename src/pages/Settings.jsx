@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import '../styles/Setting.css';
 import Button from '../components/Button';
 
-const Settings = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+const Settings = ({ isDarkMode, setIsDarkMode }) => {
   const [notificationsOn, setNotificationsOn] = useState(true);
 
   const handlePathChange = () => {
@@ -14,12 +13,12 @@ const Settings = () => {
   const [showCacheMessage, setShowCacheMessage] = useState(false);
 
   const handleCacheClear = () => {
-  setShowCacheMessage(true);
-  setTimeout(() => setShowCacheMessage(false), 4000); // 4초 후 메시지 숨김
-};
+    setShowCacheMessage(true);
+    setTimeout(() => setShowCacheMessage(false), 4000); // 4초 후 메시지 숨김
+  };
 
   return (
-    <div className="settings_page">
+    <div className={`settings_page ${isDarkMode ? 'dark-mode' : ''}`}>
       <h1 className="settings_title">Setting</h1>
       <p className="settings_desc">RETATO 애플리케이션의 설정을 관리하세요</p>
 

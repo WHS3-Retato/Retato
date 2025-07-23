@@ -52,26 +52,35 @@ def get_integrity_info(file_path):
                     break
             return None, None
         
-        ftyp_offset, _ = find_box(data, 'ftyp')
+        # ftyp 박스 검증
+        ftyp_offset, ftyp_size = find_box(data, 'ftyp')
         if ftyp_offset is None:
             result["damaged"] = True
-            result["reasons"].append("[필수 atom 손상] 'ftyp 없음")
+            result["reasons"].append("[필수 atom 손상] 'ftyp' 없음")
             return result
         elif ftyp_offset != 0:
             result["damaged"] = True
             result["reasons"].append(f"[구조 손상] 'ftyp' 위치 이상: offset={ftyp_offset}")
+        elif ftyp_size == 0:
+            result["damaged"] = True
+            result["reasons"].append("[필수 atom 손상] 'ftyp' box 사이즈 누락")
 
-        moov_offset, _ = find_box(data, 'moov')
-        mdat_offset, _ = find_box(data, 'mdat')
-
+        # moov 박스 검증
+        moov_offset, moov_size = find_box(data, 'moov')
         if moov_offset is None:
             result["damaged"] = True
             result["reasons"].append("[필수 atom 손상] 'moov' 없음")
+        elif moov_size == 0:
+            result["damaged"] = True
+            result["reasons"].append("[필수 atom 손상] 'moov' box 사이즈 누락")
+        
+        # mdat 박스 검증
+        mdat_offset, mdat_size = find_box(data, 'mdat')
         if mdat_offset is None:
             result["damaged"] = True
-            result["reasons"].append("[필수 atom 손상] 'moov' 없음")
-        if moov_offset and mdat_offset and moov_offset > mdat_offset:
-            result['damaged'] = True
-            result['reasons'].append("'moov' 박스가 'mdat' 뒤에 위치")
+            result["reasons"].append("[필수 atom 손상] 'mdat' 없음")
+        elif mdat_size == 0:
+            result["damaged"] = True
+            result["reasons"].append("[필수 atom 손상] 'mdat' box 사이즈 누락")
 
     return result

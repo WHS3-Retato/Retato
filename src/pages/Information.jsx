@@ -1,14 +1,14 @@
 import React from 'react';
 import '../styles/Information.css';
 
-const Information = () => {
+const Information = ({ isDarkMode }) => {
   return (
-    <div className="info_page">
-      <h1 className="info_title">Information</h1>
+    <div className={`info_page${isDarkMode ? ' dark-mode' : ''}`}>
+      <h1 className={`info_title${isDarkMode ? ' dark-mode' : ''}`}>Information</h1>
       {/* 소프트웨어 정보 */}
-      <div className="info_box">
-        <h1>  소프트웨어 정보</h1>
-        <table className="info_table">
+      <div className={`info_box${isDarkMode ? ' dark-mode' : ''}`}>
+        <h1 className={`info_section_title${isDarkMode ? ' dark-mode' : ''}`}>  소프트웨어 정보</h1>
+        <table className={`info_table${isDarkMode ? ' dark-mode' : ''}`}>
           <tbody>
             <tr className="stack-divider">
               <th>제품명</th>
@@ -27,9 +27,9 @@ const Information = () => {
       </div>
 
       {/* 개발자 정보 */}
-      <div className="info_box">
-        <h1>  개발자 정보</h1>
-        <table className="info_table">
+      <div className={`info_box${isDarkMode ? ' dark-mode' : ''}`}>
+        <h1 className={`info_section_title${isDarkMode ? ' dark-mode' : ''}`}>개발자 정보</h1>
+        <table className={`info_table${isDarkMode ? ' dark-mode' : ''}`}>
           <tbody>
             <tr className="stack-divider">
               <th>팀</th>
@@ -41,7 +41,7 @@ const Information = () => {
             </tr>
             <tr>
               <th>GitHub</th>
-              <td><a href="https://github.com/WHS3-Retato/Retato" target="_blank" rel="noreferrer">https://github.com/WHS3-Retato/Retato</a></td>
+              <td><a href="https://github.com/WHS3-Retato/Retato" target="_blank" rel="noreferrer" className={isDarkMode ? 'dark-mode' : ''}>https://github.com/WHS3-Retato/Retato</a></td>
             </tr>
           </tbody>
         </table>
@@ -49,35 +49,35 @@ const Information = () => {
 
       {/* 기술 스택 */}
 
-      <div className="info_box">
-        <h1>  스택 정보</h1>
-          <table className="info_table">
-            <tbody>
-              <tr className="stack-divider">
-                <th>프론트엔드</th>
-                <td>
-                  <span className="tag">Electron</span>
-                  <span className="tag">React</span>
-                  <span className="tag">JavaScript</span>
-                </td>
-              </tr>
-              <tr className="stack-divider">
-                <th>백엔드</th>
-                <td>
-                  <span className="tag">Python</span>
-                  <span className="tag">Node.js</span>
-                </td>
-              </tr>
-              <tr>
-                <th>기타 도구</th>
-                <td>
-                  <span className="tag">FFmpeg</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div className={`info_box${isDarkMode ? ' dark-mode' : ''}`}>
+        <h1 className={`info_section_title${isDarkMode ? ' dark-mode' : ''}`}>스택 정보</h1>
+        <table className={`info_table${isDarkMode ? ' dark-mode' : ''}`}>
+          <tbody>
+            <tr className="stack-divider">
+              <th>프론트엔드</th>
+              <td>
+                <span className="tag">Electron</span>
+                <span className="tag">React</span>
+                <span className="tag">JavaScript</span>
+              </td>
+            </tr>
+            <tr className="stack-divider">
+              <th>백엔드</th>
+              <td>
+                <span className="tag">Python</span>
+                <span className="tag">Node.js</span>
+              </td>
+            </tr>
+            <tr>
+              <th>기타 도구</th>
+              <td>
+                <span className="tag">FFmpeg</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+    </div>
   );
 };
 

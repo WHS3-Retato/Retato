@@ -17,7 +17,7 @@
   padding-right: 3rem;
   padding-bottom: 1.3rem;
   margin-bottom: 1.2rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .info_box h2 {
@@ -90,6 +90,7 @@
 .info_table.dark-mode th,
 .info_table.dark-mode td {
   border-bottom: 1px solid #334155;
+  color: #f1f5f9;
 }
 
 .info_table.dark-mode th {
@@ -112,6 +113,7 @@ a.dark-mode {
   background: #334155;
   color: #cbd5e1;
 }
+
 
 a {
   color: #1e80ff;
