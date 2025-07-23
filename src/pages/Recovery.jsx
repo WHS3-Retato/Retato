@@ -97,16 +97,18 @@ const Recovery = () => {
     [results, selectedAnalysisFile]
   );
 
-  const slack_info = analysis?.slack_info ?? { slack_rate: 0 };
+  const selectedResultFile = useMemo(
+    () => results.find(f => f.name === selectedAnalysisFile),
+    [results, selectedAnalysisFile]
+  );
+
+  const slack_info = selectedResultFile?.slack_info ?? { slack_rate: 0 };
   const safeSlackRate = slack_info.slack_rate ?? 0;
 
-  // slackRatePercent와 동일한 방식으로 계산
-  let slackPercent = 'N/A';
-  if (safeSlackRate !== null && safeSlackRate !== undefined && typeof safeSlackRate === 'number') {
-    slackPercent = safeSlackRate <= 1
-      ? (safeSlackRate * 100).toFixed(1)
-      : safeSlackRate.toFixed(1);
-  }
+  // slackRatePercent와 동일한 계산 로직 사용
+  const slackPercent = safeSlackRate <= 1
+    ? (safeSlackRate * 100).toFixed(0)
+    : safeSlackRate.toFixed(0);
 
   const validPercent = (100 - safeSlackRate * 100).toFixed(1);
 
@@ -367,54 +369,85 @@ const Recovery = () => {
 
   // view
   useEffect(() => {
-    const video = document.getElementById('parser-video');
-    const playPauseBtn = document.getElementById('playPauseBtn');
-    const playPauseIcon = document.getElementById('playPauseIcon');
-    const replayBtn = document.getElementById('replayBtn');
-    const fullscreenBtn = document.getElementById('fullscreenBtn');
-    const progressBar = document.getElementById('progressBar');
-    const timeText = document.getElementById('timeText');
+    if (!selectedAnalysisFile) return;
 
-    if (!video) return;
+    const waitForDOMAndSetup = () => {
+      const video = document.getElementById('parser-video');
+      const playPauseBtn = document.getElementById('playPauseBtn');
+      const playPauseIcon = document.getElementById('playPauseIcon');
+      const replayBtn = document.getElementById('replayBtn');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+      const progressBar = document.getElementById('progressBar');
+      const timeText = document.getElementById('timeText');
 
-    playPauseBtn.onclick = () => {
-      if (video.paused) {
+      if (!video || !playPauseBtn || !replayBtn || !fullscreenBtn || !progressBar || !timeText || !playPauseIcon) {
+        console.warn('🎥 video 또는 컨트롤 요소가 아직 없음, 재시도');
+        requestAnimationFrame(waitForDOMAndSetup);
+        return;
+      }
+
+      // 전체화면 기능 개선
+      fullscreenBtn.onclick = () => {
+        if (!document.fullscreenElement) {
+          // 전체화면으로 진입
+          if (video.requestFullscreen) {
+            video.requestFullscreen().catch(err => {
+              console.error('전체화면 진입 실패:', err);
+            });
+          } else if (video.webkitRequestFullscreen) {
+            video.webkitRequestFullscreen();
+          } else if (video.msRequestFullscreen) {
+            video.msRequestFullscreen();
+          }
+        } else {
+          // 전체화면 종료
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          }
+        }
+      };
+
+      playPauseBtn.onclick = () => {
+        if (video.paused) {
+          video.play();
+          playPauseIcon.src = 'view_pause.svg';
+        } else {
+          video.pause();
+          playPauseIcon.src = 'view_play.svg';
+        }
+      };
+
+      replayBtn.onclick = () => {
+        video.currentTime = 0;
         video.play();
-        playPauseIcon.src = 'view_pause.svg';
-      } else {
-        video.pause();
-        playPauseIcon.src = 'view_play.svg';
+      };
+
+      video.ontimeupdate = () => {
+        progressBar.value = video.currentTime;
+        timeText.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+      };
+
+      progressBar.oninput = () => {
+        video.currentTime = progressBar.value;
+      };
+
+      video.onloadedmetadata = () => {
+        progressBar.max = video.duration;
+      };
+
+      function formatTime(seconds) {
+        const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
+        return `${min}:${sec}`;
       }
     };
 
-    replayBtn.onclick = () => {
-      video.currentTime = 0;
-      video.play();
-    };
-
-    fullscreenBtn.onclick = () => {
-      if (video.requestFullscreen) video.requestFullscreen();
-    };
-
-    video.ontimeupdate = () => {
-      progressBar.value = video.currentTime;
-      timeText.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-    };
-
-    progressBar.oninput = () => {
-      video.currentTime = progressBar.value;
-    };
-
-    video.onloadedmetadata = () => {
-      progressBar.max = video.duration;
-    };
-
-    function formatTime(seconds) {
-      const min = Math.floor(seconds / 60).toString().padStart(2, '0');
-      const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
-      return `${min}:${sec}`;
-    }
-  }, []); // 컴포넌트가 mount될 때 1번만 실행
+    requestAnimationFrame(waitForDOMAndSetup);
+  }, [selectedAnalysisFile]); // selectedAnalysisFile이 변경될 때마다 실행
 
   const startRecoveryFromDownload = () => {
     setShowDownloadPopup(false);
@@ -728,7 +761,7 @@ const Recovery = () => {
                     <div className="parser-info-row">
                       <span className="parser-info-label">유효 데이터 비율</span>
                       <span className="parser-info-value">
-                        {(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)} %
+                        {100 - slackPercent} %
                       </span>
                     </div>
                     <div className="parser-info-row">
@@ -738,7 +771,7 @@ const Recovery = () => {
                       <div
                         className="data-bar-used"
                         style={{
-                          width: `${(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)}%`
+                          width: `${100 - slackPercent}%`
                         }}
                       />
                     </div>
