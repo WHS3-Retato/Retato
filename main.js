@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron'); // ✅ 한 줄에 다 합침
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const readline = require('readline');
@@ -7,6 +7,7 @@ const checkDiskSpace = require('check-disk-space').default;
 const fs = require('fs').promises;
 const fssync = require('fs');
 const os = require('os');
+
 
 let mainWindow = null;
 
@@ -103,11 +104,25 @@ function createWindow() {
     },
   });
 
+
+
   mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
   startDrivePolling();
 }
 
-app.whenReady().then(createWindow);
+// view
+app.whenReady().then(() => {
+  // ✅ stream 프로토콜 등록
+  protocol.interceptFileProtocol('stream', (request, callback) => {
+    const url = request.url.substr(9); // 'stream://' 제거
+    const decodedPath = decodeURIComponent(url);
+    console.log('📦 stream 요청:', decodedPath);
+    callback({ path: decodedPath });
+  });
+
+  // 기존 창 생성
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -132,7 +147,7 @@ ipcMain.handle('read-folder', async (_event, folderPath) => {
         try {
           size = (await fs.stat(full)).size;
         } catch {
-          try { size = fssync.statSync(full).size; } catch {}
+          try { size = fssync.statSync(full).size; } catch { }
         }
       }
       items.push({
@@ -191,6 +206,10 @@ ipcMain.handle('start-recovery', (_event, e01FilePath) => {
           try {
             const raw = await fs.readFile(data.analysisPath, 'utf8');
             const results = JSON.parse(raw);
+            console.log('📤 [MAIN.JS] 프론트엔드로 전송할 결과 개수:', results.length);
+            results.forEach((result, index) => {
+              console.log(`📤 [MAIN.JS] 결과 ${index}: name=${result.name}, slack_info=`, result.slack_info);
+            });
             mainWindow.webContents.send('recovery-results', results);
           } catch (err) {
             console.error('Failed to read analysis.json:', err);
@@ -285,7 +304,7 @@ ipcMain.handle('run-download', (_event, { e01Path, choice, downloadDir }) => {
 
 ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']  
+    properties: ['openDirectory']
   });
   return result;
 });

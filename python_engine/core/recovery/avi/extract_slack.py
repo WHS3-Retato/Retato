@@ -122,7 +122,8 @@ def recover_avi_slack(input_avi, raw_out_dir, slack_out_dir, channels_out_dir, t
     for label in ("front","rear","side"):
         logger.info(f"[SLP][{label}] 채널 분리 시작: {basename}")
         channel_data, frame_count, codec = split_channel_bytes(data, label)
-        logger.info(f"{basename}_{label}: frame_count={frame_count}, codec={codec}")
+        logger.info(f"[BACKEND] AVI 슬랙 정보: {basename}_{label}, frame_count={frame_count}, codec={codec}")
+        logger.info(f"[BACKEND] AVI 슬랙 데이터 크기: channel_data_size={len(channel_data)}, total_file_size={len(data)}")
         
         if frame_count == 0:
             logger.info(f"[SLP][{label}] 프레임 없음 → 건너뜀")
@@ -136,6 +137,7 @@ def recover_avi_slack(input_avi, raw_out_dir, slack_out_dir, channels_out_dir, t
 
         slack_h264 = os.path.join(raw_out_dir, f"{basename}_{label}_slack.h264")
         slack_count = extract_frames_from_raw(channel_data, sps_pps, codec, slack_h264)
+        logger.info(f"[BACKEND] AVI 슬랙 프레임 추출 결과: {basename}_{label}, slack_count={slack_count}")
         if slack_count == 0:
             logger.info(f"[SLP][{label}] 슬랙 프레임 없음 → 삭제 및 건너뜀")
             os.remove(slack_h264)
@@ -158,8 +160,10 @@ def recover_avi_slack(input_avi, raw_out_dir, slack_out_dir, channels_out_dir, t
         results[label] = {
             'recovered': True,
             'hidden_path': hidden_mp4,
-            'frame_count': slack_count
+            'frame_count': slack_count,
+            'slack_rate': float(len(channel_data) / len(data) * 100)  # 채널 데이터 크기 / 전체 파일 크기
         }
+        logger.info(f"[BACKEND] AVI 슬랙 비율 계산: {basename}_{label}, channel_size={len(channel_data)}, total_size={len(data)}, slack_rate={results[label]['slack_rate']:.2f}%")
 
     # 3) 원본 채널 MP4 생성
     for label in ("front","rear","side"):

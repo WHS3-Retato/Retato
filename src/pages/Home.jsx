@@ -67,6 +67,7 @@ function ExplorerView({
   onSelectDrive,
   onOpenDir,
   onSelectE01,
+  isDarkMode,
 }) {
   const displayPath = formatDrivePath(currentPath, mountPath);
   const canBack = currentPath !== mountPath;
@@ -83,21 +84,21 @@ function ExplorerView({
   };
 
   return (
-    <div id="explorer">
-      <div className="drive_category">
+    <div id="explorer" className={isDarkMode ? 'dark-mode' : ''}>
+      <div className={`drive_category ${isDarkMode ? 'dark-mode' : ''}`}>
         <div className="drive_header">
           <div className="drive_header_left">
             <img src={DriveIcon} className="drive_icon" alt="" />
             <span className="drive_path_text">{displayPath}</span>
           </div>
           <div className="drive_controls">
-          <Button variant="gray" disabled={!canBack} onClick={canBack ? onBack : undefined}>
-            뒤로 가기
-          </Button>
+            <Button variant="gray" disabled={!canBack} onClick={canBack ? onBack : undefined}>
+              뒤로 가기
+            </Button>
 
-          <Button variant="dark" onClick={onSelectDrive}>
-            드라이브 선택
-          </Button>
+            <Button variant="dark" onClick={onSelectDrive}>
+              드라이브 선택
+            </Button>
           </div>
         </div>
 
@@ -118,7 +119,7 @@ function ExplorerView({
               </div>
             ))}
           </div>
-          
+
           <div id="selected_file_info">
             {selectedE01 && (
               <div className="selected_box">
@@ -154,7 +155,7 @@ function DriveSection({ title, drives, onDriveClick }) {
   );
 }
 
-const Home = () => {
+const Home = ({ isDarkMode }) => {
   const [drives, setDrives] = useState([]);
   const [currentPath, setCurrentPath] = useState('');
   const [entries, setEntries] = useState([]);
@@ -209,12 +210,12 @@ const Home = () => {
   const handleSelectE01 = (entry) => setSelectedE01(entry);
 
   return (
-    <div className="main_content">
+    <div className={`main_content ${isDarkMode ? 'dark-mode' : ''}`}>
       {!mountPath && (
         <>
-          <h1>드라이브를 선택해 복원을 시작하세요</h1>
+          <h1 className={`home_title${isDarkMode ? ' dark-mode' : ''}`}>드라이브를 선택해 복원을 시작하세요</h1>
 
-          <div className="drive_wrapper">
+          <div className={`drive_wrapper${isDarkMode ? ' dark-mode' : ''}`}>
             <DriveSection
               title="내장 드라이브"
               drives={categorized.internal}

@@ -102,7 +102,7 @@ body {
   --bar-height: 12px;
   display: flex;
   justify-content: center;
-  align-items: center; 
+  align-items: center;
   gap: 0.5rem;
   margin-top: 2rem;
   height: var(--bar-height);
@@ -141,7 +141,7 @@ body {
   background-color: #fff;
   border-radius: 0.6rem;
   margin-bottom: 1rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   max-width: 880px;
 }
 
@@ -179,7 +179,7 @@ body {
 /* Result-page */
 
 .result-group {
-  margin: 1rem 0;
+  margin: 1rem;
 }
 
 .result-group-header {
@@ -200,11 +200,11 @@ body {
 .result-group-toggle::before {
   content: '';
   display: inline-block;
-  width: 0.6rem;        
+  width: 0.6rem;
   height: 0.6rem;
   background-color: #1f2937;
   clip-path: polygon(25% 10%, 75% 50%, 25% 90%);
-  border-radius: 20%;   
+  border-radius: 20%;
   transition: transform 0.3s ease;
   margin-left: 0.5rem;
 }
@@ -219,7 +219,7 @@ body {
 }
 
 .result-file-list {
-  margin-left: 2rem;
+  margin-left: 3.5rem;
 }
 
 .result-file-item {
@@ -259,7 +259,7 @@ body {
 
 .path-box {
   display: flex;
-  width: 100%; 
+  width: 100%;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
@@ -276,13 +276,15 @@ body {
 
 
 .result-scroll-area {
-  max-height: 400px; /* 원하는 높이로 조정 (예: 400~500px) */
+  max-height: 400px;
+  /* 원하는 높이로 조정 (예: 400~500px) */
   overflow-y: auto;
-  padding-right: 0.5rem; /* 스크롤바 공간 */
+  padding-right: 0.5rem;
+  /* 스크롤바 공간 */
 }
 
 .result-wrapper {
-  margin: 1rem; 
+  margin: 1rem;
 }
 
 .text-button {
@@ -353,9 +355,11 @@ body {
   background: white;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  max-height: 50vh;        /* 뷰포트 높이의 50% */
-  display: flex;           /* 내부 video 중앙 정렬용 */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  max-height: 50vh;
+  /* 뷰포트 높이의 50% */
+  display: flex;
+  /* 내부 video 중앙 정렬용 */
   justify-content: center;
   align-items: center;
 }
@@ -370,7 +374,7 @@ body {
   position: absolute;
   bottom: 0;
   width: 100%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   padding: 10px 14px;
   display: flex;
   align-items: center;
@@ -443,15 +447,18 @@ body {
 }
 
 .status-text.yellow {
-  color: #d97706; /* 주황 */
+  color: #d97706;
+  /* 주황 */
 }
 
 .status-text.red {
-  color: #dc2626; /* 빨강 */
+  color: #dc2626;
+  /* 빨강 */
 }
 
 .status-text.green {
-  color: #16a34a; /* 초록 */
+  color: #16a34a;
+  /* 초록 */
 }
 
 .data-bar-wrapper {
@@ -486,13 +493,13 @@ body {
 }
 
 .structure-pre {
-  white-space: pre-wrap; 
-  margin: 0;    
-  padding-top: 0.5rem;  
+  white-space: pre-wrap;
+  margin: 0;
+  padding-top: 0.5rem;
 }
 
 .reason-list {
-  list-style: none;   
-  margin: 0;   
-  padding: 0;  
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }

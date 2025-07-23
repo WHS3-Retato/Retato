@@ -54,7 +54,10 @@ def get_integrity_info(file_path):
         
         # ftyp 박스 검증
         ftyp_offset, ftyp_size = find_box(data, 'ftyp')
-        if ftyp_offset is None:
+        if ftyp_size == 0:
+            result["damaged"] = True
+            result["reasons"].append("[필수 atom 손상] 'ftyp' box 사이즈 누락")
+        elif ftyp_offset is None:
             result["damaged"] = True
             result["reasons"].append("[필수 atom 손상] 'ftyp' 없음")
             return result
@@ -67,25 +70,20 @@ def get_integrity_info(file_path):
 
         # moov 박스 검증
         moov_offset, moov_size = find_box(data, 'moov')
-        if moov_offset is None:
-            result["damaged"] = True
-            result["reasons"].append("[필수 atom 손상] 'moov' 없음")
-        elif moov_size == 0:
+        if moov_size == 0:
             result["damaged"] = True
             result["reasons"].append("[필수 atom 손상] 'moov' box 사이즈 누락")
+        elif moov_offset is None:
+            result["damaged"] = True
+            result["reasons"].append("[필수 atom 손상] 'moov' 없음")
         
         # mdat 박스 검증
         mdat_offset, mdat_size = find_box(data, 'mdat')
-        if mdat_offset is None:
-            result["damaged"] = True
-            result["reasons"].append("[필수 atom 손상] 'mdat' 없음")
-        elif mdat_size == 0:
+        if mdat_size == 0:
             result["damaged"] = True
             result["reasons"].append("[필수 atom 손상] 'mdat' box 사이즈 누락")
-        
-        # moov와 mdat 위치 관계 검증
-        if moov_offset and mdat_offset and moov_offset > mdat_offset:
-            result['damaged'] = True
-            result['reasons'].append("'moov' 박스가 'mdat' 뒤에 위치")
+        elif mdat_offset is None:
+            result["damaged"] = True
+            result["reasons"].append("[필수 atom 손상] 'mdat' 없음")
 
     return result
