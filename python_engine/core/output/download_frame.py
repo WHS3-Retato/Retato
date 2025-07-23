@@ -5,7 +5,9 @@ import tempfile
 import logging
 
 logger = logging.getLogger(__name__)
-FRAME_EXTRACTOR = os.path.abspath("bin/ffmpeg.exe")
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+FRAME_EXTRACTOR = os.path.join(BASE_DIR, "bin", "ffmpeg.exe")
 
 def extract_frames_with_ffmpeg(video_path, output_dir):
     cmd = [
@@ -30,39 +32,31 @@ def zip_directory(source_dir, zip_path):
 
 def download_frames(video_info_list, download_dir):
     os.makedirs(download_dir, exist_ok=True)
-    saved = []
+    frame_zip_path = os.path.join(download_dir, "frames.zip")
+    with zipfile.ZipFile(frame_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for info in video_info_list:
+            video_path = info.get("output_path")
+            filename = info.get("filename")
+            if not video_path or not filename or not os.path.exists(video_path):
+                logger.warning(f"유효하지 않은 영상: {video_path}")
+                continue
 
-    for info in video_info_list:
-        video_path = info.get("output_path")
-        filename = info.get("filename")
-
-        if not video_path or not filename or not os.path.exists(video_path):
-            logger.warning(f"유효하지 않은 영상: {video_path}")
-            continue
-
-        name, _ = os.path.splitext(filename)
-        zip_name = f"{name}.zip"
-        zip_path = os.path.join(download_dir, zip_name)
-
-        counter = 1
-        while os.path.exists(zip_path):
-            zip_path = os.path.join(download_dir, f"{name}_copy{counter}.zip")
-            counter += 1
-
-        try:
+            name, _ = os.path.splitext(filename)
             with tempfile.TemporaryDirectory() as temp_dir:
+                frame_dir = os.path.join(temp_dir, name)
+                os.makedirs(frame_dir, exist_ok=True)
                 logger.info(f"프레임 추출 중: {filename}")
-                success = extract_frames_with_ffmpeg(video_path, temp_dir)
+                success = extract_frames_with_ffmpeg(video_path, frame_dir)
                 if not success:
                     logger.error(f"프레임 추출 실패: {filename}")
                     continue
 
-                zip_directory(temp_dir, zip_path)
-                logger.info(f"압축 완료: {zip_path}")
-                saved.append({ "saved_path": zip_path, "filename": os.path.basename(zip_path) })
-
-        except Exception as e:
-            logger.error(f"{filename} 처리 중 예외 발생 {e}")
-
+                # frame_dir 내부의 모든 파일을 zip에 [영상이름]/프레임.jpg로 저장
+                for root, _, files in os.walk(frame_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.join(name, file)
+                        zipf.write(file_path, arcname)
+                logger.info(f"{filename} 프레임 압축 완료")
     
-    return saved
+    return [{"saved_path": frame_zip_path, "filename": "frame.zip"}]

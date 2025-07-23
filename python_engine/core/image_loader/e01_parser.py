@@ -9,6 +9,7 @@ import time
 import logging
 import tempfile
 import shutil
+import json, sys
 from python_engine.core.recovery.mp4.extract_slack import recover_mp4_slack
 from python_engine.core.recovery.avi.extract_slack import recover_avi_slack
 from python_engine.core.analyzer.basic_info_parser import get_basic_info
@@ -97,7 +98,8 @@ def extract_video_files(fs_info, output_dir, path="/", total_count=None, progres
         processed += 1
         if progress:
             progress[0] += 1
-            logger.info(f"[{progress[0]}/{total_count}] 처리 중: {filepath}")
+            msg = {"processed": progress[0], "total": total_count}
+            print(json.dumps(msg), flush=True)
         
         # 파일 읽기
         fobj = fs_info.open(filepath)
@@ -156,6 +158,7 @@ def extract_video_files(fs_info, output_dir, path="/", total_count=None, progres
                 'name': name,
                 'path': filepath,
                 'size': size,
+                'origin_video': orig_path,
                 'slack_info': slack_info,
                 'analysis': analysis
             })
@@ -199,6 +202,7 @@ def extract_video_files(fs_info, output_dir, path="/", total_count=None, progres
             'name': name,
             'path': filepath,
             'size': size,
+            'origin_video': orig_path,
             'channels': avi_info
         })
 
@@ -208,11 +212,11 @@ def extract_video_files(fs_info, output_dir, path="/", total_count=None, progres
 
     return results
 
-def extract_videos_from_e01():
+def extract_videos_from_e01(e01_path):
     start_time = time.time()
 
-    print("이미지 파일(.E01 또는 .001)을 선택해주세요.")
-    img_path = select_image_file()
+    img_path = e01_path
+    logger.info(f"▶ 분석용 E01 파일: {img_path}")
 
     if not img_path:
         print("E01 파일을 선택하지 않았습니다. 종료합니다.")
@@ -225,17 +229,22 @@ def extract_videos_from_e01():
         logger.error(f"이미지 열기 실패: {e}")
         return [], None, 0
 
+    # 작업 결과를 저장할 임시 폴더 생성
     output_dir = tempfile.mkdtemp(prefix="retato_")
 
     for part in volume:
+        # 사용 불가 파티션 건너뛰기
         if part.flags == pytsk3.TSK_VS_PART_FLAG_UNALLOC or part.start == 0:
             logger.info(f"건너뜀: Unallocated 파티션 (offset: {part.start})")
             continue
 
         fs = pytsk3.FS_Info(img_info, offset=part.start * 512)
         total = count_video_files(fs)
-        print(f"전체 대상 영상 수: {total}개")
-        
+
+        # 시작 전 전체 개수 한 번 전송
+        print(json.dumps({"processed": 0, "total": total}), flush=True)
+
+        # 실제 복구 및 진행 상황 출력
         res = extract_video_files(
             fs,
             output_dir,
@@ -243,12 +252,15 @@ def extract_videos_from_e01():
             total_count=total,
             progress=[0]
         )
-        
+
+        # 처리 시간 로깅
         elapsed = int(time.time() - start_time)
         h, rem = divmod(elapsed, 3600)
         m, s = divmod(rem, 60)
         print(f"소요 시간: {h}시간 {m}분 {s}초")
-        
+
+        # 첫 파티션만 처리하고 종료
         return res, output_dir, total
 
-    return [], None, 0
+    # 파티션이 하나도 없을 경우
+    return res, output_dir, total

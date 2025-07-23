@@ -1,0 +1,149 @@
+.settings_page {
+  overflow-y: auto;
+  padding : 1rem;
+}
+
+.settings_title {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+}
+
+.settings_desc {
+  color: #888;
+  margin-bottom: 2rem;
+}
+
+.settings_box {
+  background: white;
+  border-radius: 0.7rem;
+  padding-top: 1rem;
+  padding-left: 2rem;
+  padding-bottom: 1.3rem;
+  margin-bottom: 1.2rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);   
+}
+
+.settings_box_title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+}
+
+.settings_box_desc {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 34px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background-color: white;
+  left: 3px;
+  bottom: 3px;
+  transition: 0.4s;
+}
+
+.toggle-switch input:checked + .slider {
+  background-color: #3B82F6;
+}
+
+.toggle-switch input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+.path_input_area {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.path_input {
+  flex: 1;
+  background: #f3f4f6;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.format_options {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.radio-btn {
+  border: 1px solid #ccc;
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.6rem;
+  cursor: pointer;
+  font-weight: 500;
+  background: #f9fafb;
+  color: #333;
+}
+
+.radio-btn.selected {
+  border: 2px solid #3B82F6;
+  background: #eef3fe;
+  color: #3B82F6;
+}
+
+.radio-btn input {
+  display: none;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setting-text {
+  flex: 1;
+}
+
+.setting-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 120px;
+  margin-right: 2rem;
+}
+
+.cache-inline-msg {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin-left: 1rem;
+  font-weight: 500;
+}
