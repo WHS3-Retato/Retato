@@ -197,13 +197,31 @@ def extract_video_files(fs_info, output_dir, path="/", total_count=None, progres
                 dst = os.path.join(chan_dir, os.path.basename(full_mp4))
                 shutil.copy2(full_mp4, dst)
 
-        # 결과 저장
+        # 결과 저장 - AVI의 경우 slack_info 추가
+        # 각 채널의 slack_rate 중 최대값을 사용하거나 평균값을 사용
+        slack_rates = [info.get('slack_rate', 0) for info in avi_info.values() if 'slack_rate' in info]
+        overall_slack_rate = max(slack_rates) if slack_rates else 0.0
+        
+        slack_info = {
+            'slack_rate': overall_slack_rate,
+            'channels': avi_info  # 채널별 상세 정보도 포함
+        }
+        
+        analysis = {
+            'basic': get_basic_info(orig_path),
+            'integrity': get_integrity_info(orig_path),
+            'structure': get_structure_info(orig_path),
+            'slack_info': slack_info  # 분석에도 포함
+        }
+        
         results.append({
             'name': name,
             'path': filepath,
             'size': size,
             'origin_video': orig_path,
-            'channels': avi_info
+            'slack_info': slack_info,  # 최상위 레벨에 slack_info 추가
+            'channels': avi_info,
+            'analysis': analysis
         })
 
     # 요약 출력

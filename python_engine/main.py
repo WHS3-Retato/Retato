@@ -22,6 +22,18 @@ def main(e01_path, choice=None, download_dir=None):
     # 1.1) 분석 결과 JSON 저장 (temp)
     os.makedirs(output_dir, exist_ok=True)
     tmp_json = os.path.join(output_dir, "analysis.json")
+    
+    # slack_rate를 명시적으로 float로 변환
+    for i, result in enumerate(results):
+        print(f"[BACKEND] 결과 {i}: {result['name']}", file=sys.stderr, flush=True)
+        if result.get('slack_info') and 'slack_rate' in result['slack_info']:
+            slack_rate = result['slack_info']['slack_rate']
+            if slack_rate is not None:
+                result['slack_info']['slack_rate'] = float(slack_rate)
+                print(f"[BACKEND] JSON 저장 전 슬랙 비율 변환: file={result['name']}, slack_rate={result['slack_info']['slack_rate']} (type: {type(result['slack_info']['slack_rate'])})", file=sys.stderr, flush=True)
+        else:
+            print(f"[BACKEND] slack_info 없음: file={result['name']}", file=sys.stderr, flush=True)
+    
     with open(tmp_json, "w", encoding="utf-8") as wf:
         json.dump(results, wf, ensure_ascii=False, indent=2)
 

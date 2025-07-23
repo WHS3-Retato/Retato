@@ -1,7 +1,7 @@
 import subprocess
 
 # FFmpeg 실행 파일 경로
-FFMPEG_PATH = r"E:\Retato\bin\ffmpeg.exe"
+FFMPEG_PATH = r"C:\Users\lian0\Desktop\미디어(영상) 포렌식_강의자료\ffmpeg-7.1.1-essentials_build\bin\ffmpeg.exe"
 
 def convert_video(input_path, output_path, extra_args=None):
     cmd = [

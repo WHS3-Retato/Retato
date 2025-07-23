@@ -149,24 +149,34 @@ def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format
         logger.info(f"{filename} → 복구된 프레임 수: {frame_count}개, 복구 바이트: {recovered_bytes}")
 
         if frame_count > 0:
-            convert_video(h264_path, mp4_path, extra_args=['-c:v', 'copy'])
-            logger.info(f"{filename} → 영상 변환 완료: {mp4_path}")
-            slack_rate = recovered_bytes / len(data) * 100
-            return {
+            logger.info(f"{filename} → 프레임 복구 성공! convert_video 시작...")
+            try:
+                convert_video(h264_path, mp4_path, extra_args=['-c:v', 'copy'])
+                logger.info(f"{filename} → 영상 변환 완료: {mp4_path}")
+            except Exception as convert_error:
+                logger.error(f"{filename} → convert_video 실패: {convert_error}")
+                # convert_video 실패해도 일단 성공으로 처리 (h264 파일은 있으니까)
+            
+            final_slack_rate = recovered_bytes / len(data) * 100
+            logger.info(f"{filename} → 최종 slack_rate: {final_slack_rate:.4f}%")
+            
+            result = {
                 "recovered": True,
                 "frame_count": frame_count,
                 "h264_path": h264_path,
                 "output_path": mp4_path,
                 "video": mp4_path,
                 "recovered_slack_path": mp4_path,
-                "slack_rate": slack_rate
+                "slack_rate": final_slack_rate
             }
+            logger.info(f"{filename} → 성공 결과 반환: {result}")
+            return result
         else:
             if os.path.exists(h264_path):
                 os.remove(h264_path)
             logger.info(f"{filename} → 유효한 프레임 없음 (삭제됨)")
             slack_rate = 0.0
-            return {
+            result = {
                 "recovered": False,
                 "frame_count": 0,
                 "h264_path": h264_path,
@@ -175,9 +185,12 @@ def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format
                 "recovered_slack_path": mp4_path,
                 "slack_rate": slack_rate
             }
-    except Exception:
-        logger.exception(f"{filename} 복원 중 예외 발생")
-        return {
+            logger.info(f"{filename} → 실패 결과 반환: {result}")
+            return result
+    except Exception as e:
+        logger.error(f"{filename} 복원 중 예외 발생: {type(e).__name__}: {e}")
+        logger.exception(f"{filename} 상세 예외 정보:")
+        result = {
             "recovered": False,
             "frame_count": 0,
             "h264_path": None,
@@ -186,3 +199,5 @@ def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format
             "recovered_slack_path": None,
             "slack_rate": None
         }
+        logger.error(f"{filename} → 예외로 인한 실패 결과 반환: {result}")
+        return result

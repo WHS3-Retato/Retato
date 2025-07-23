@@ -103,7 +103,7 @@ function createWindow() {
     },
   });
 
-  
+
 
   mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
   startDrivePolling();
@@ -146,7 +146,7 @@ ipcMain.handle('read-folder', async (_event, folderPath) => {
         try {
           size = (await fs.stat(full)).size;
         } catch {
-          try { size = fssync.statSync(full).size; } catch {}
+          try { size = fssync.statSync(full).size; } catch { }
         }
       }
       items.push({
@@ -204,6 +204,10 @@ ipcMain.handle('start-recovery', (_event, e01FilePath) => {
           try {
             const raw = await fs.readFile(data.analysisPath, 'utf8');
             const results = JSON.parse(raw);
+            console.log('📤 [MAIN.JS] 프론트엔드로 전송할 결과 개수:', results.length);
+            results.forEach((result, index) => {
+              console.log(`📤 [MAIN.JS] 결과 ${index}: name=${result.name}, slack_info=`, result.slack_info);
+            });
             mainWindow.webContents.send('recovery-results', results);
           } catch (err) {
             console.error('Failed to read analysis.json:', err);
@@ -233,7 +237,7 @@ ipcMain.handle('start-recovery', (_event, e01FilePath) => {
 
 ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']  
+    properties: ['openDirectory']
   });
   return result;
 });

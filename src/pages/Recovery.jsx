@@ -39,15 +39,31 @@ const Recovery = () => {
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [saveFrames, setSaveFrames] = useState(false);
-  const [selectedPath, setSelectedPath] = useState("C:\\Users\\Downloads");
+  const [selectedPath, setSelectedPath] = useState("");
 
   const [isRecovering, setIsRecovering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentCount, setCurrentCount] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
 
+  const [showSlackPopup, setShowSlackPopup] = useState(false);
+
   const [results, setResults] = useState([]);
   const [openGroups, setOpenGroups] = useState({});
+
+  const [slackVideoSrc, setSlackVideoSrc] = useState('');
+
+  // results 상태 변경 감지
+  useEffect(() => {
+    console.log('📊 [FRONTEND] Results 상태 업데이트됨!');
+    console.log('📊 [FRONTEND] Results 길이:', results.length);
+    results.forEach((result, index) => {
+      const slackRate = result.slack_info?.slack_rate;
+      const displayRate = slackRate !== null && slackRate !== undefined ? slackRate : 'N/A';
+      console.log(`📊 [FRONTEND] Result ${index + 1}: ${result.name} - Slack Rate: ${displayRate}`);
+    });
+  }, [results]);
+
   function groupByCategory(list) {
     return list.reduce((acc, file) => {
       const cat = file.path.split(/[/\\]/)[1] || 'unknown'
@@ -82,8 +98,17 @@ const Recovery = () => {
   );
 
   const slack_info = analysis?.slack_info ?? { slack_rate: 0 };
-  const slackPercent = (slack_info.slack_rate * 100).toFixed(0);
-  const validPercent = (100 - slack_info.slack_rate * 100).toFixed(1);
+  const safeSlackRate = slack_info.slack_rate ?? 0;
+
+  // slackRatePercent와 동일한 방식으로 계산
+  let slackPercent = 'N/A';
+  if (safeSlackRate !== null && safeSlackRate !== undefined && typeof safeSlackRate === 'number') {
+    slackPercent = safeSlackRate <= 1
+      ? (safeSlackRate * 100).toFixed(1)
+      : safeSlackRate.toFixed(1);
+  }
+
+  const validPercent = (100 - safeSlackRate * 100).toFixed(1);
 
   useEffect(() => {
     if (progress >= 100) {
@@ -122,7 +147,6 @@ const Recovery = () => {
     // prefix 기본 매핑
     const prefix = Object.keys(categoryIcons).find((k) =>
       cat.startsWith(k)
-
     );
     return prefix ? categoryIcons[prefix] : slackIcon;
   };
@@ -131,12 +155,12 @@ const Recovery = () => {
   useEffect(() => {
     console.log('📡 onProgress useEffect mounted');
     const offProg = window.api.onProgress(({ processed, total }) => {
-      console.log('📈 progress event', processed, total);
+      console.log('📈 [FRONTEND] progress event - processed:', processed, 'total:', total);
       setTotalFiles(total);
       setProgress(Math.floor((processed / total) * 100));
     });
     const offDone = window.api.onDone(() => {
-      console.log('✅ recovery done event');
+      console.log('✅ [FRONTEND] recovery done event');
       setProgress(100);
       setIsRecovering(false);
       setRecoveryDone(true);
@@ -147,22 +171,57 @@ const Recovery = () => {
   useEffect(() => {
     console.log('📡 onResults listener registered')
     const off = window.api.onResults(data => {
-      console.log('📥 [Debug] onResults data:', data)
+      console.log('📥 [FRONTEND] =========================== 데이터 수신 ===========================');
+      console.log('📥 [FRONTEND] onResults 받은 전체 데이터:', data);
+      console.log('📥 [FRONTEND] 데이터 타입:', typeof data);
+      console.log('📥 [FRONTEND] 배열 여부:', Array.isArray(data));
+
+      if (Array.isArray(data)) {
+        console.log('📥 [FRONTEND] 총 파일 개수:', data.length);
+        console.log('📥 [FRONTEND] ==================== 각 파일별 상세 정보 ====================');
+
+        data.forEach((item, index) => {
+          console.log(`📥 [FRONTEND] ========== 파일 ${index + 1} ==========`);
+          console.log(`📥 [FRONTEND] 파일명: ${item.name}`);
+          console.log(`📥 [FRONTEND] 경로: ${item.path}`);
+          console.log(`📥 [FRONTEND] 크기: ${item.size} bytes`);
+
+          if (item.slack_info) {
+            console.log(`📥 [FRONTEND] 🔥 SLACK INFO 존재!`);
+            console.log(`📥 [FRONTEND] 🔥 Slack Rate: ${item.slack_info.slack_rate}`);
+            console.log(`📥 [FRONTEND] 🔥 Slack Info 전체:`, item.slack_info);
+          } else {
+            console.log(`📥 [FRONTEND] ⚠️ SLACK INFO 없음!`);
+          }
+
+          if (item.analysis) {
+            console.log(`📥 [FRONTEND] Analysis 존재:`, Object.keys(item.analysis));
+          } else {
+            console.log(`📥 [FRONTEND] Analysis 없음`);
+          }
+
+          console.log(`📥 [FRONTEND] 전체 항목 ${index + 1}:`, JSON.stringify(item, null, 2));
+        });
+      } else if (data.error) {
+        console.error('📥 [FRONTEND] 에러 받음:', data.error);
+        setResultError(data.error);
+      } else {
+        console.log('📥 [FRONTEND] 단일 객체:', JSON.stringify(data, null, 2));
+      }
+
       if (data.error) setResultError(data.error);
       else setResults(data);
     });
     return off;
   }, []);
 
-  useEffect(() => {
-    const init = {}
-    Object.keys(groupedResults).forEach(cat => { init[cat] = true })
-    setOpenGroups(init)
-  }, [groupedResults])
+  // onAnalysisPath, onDownloadLog, onDownloadError 리스너들은 
+  // preload.js에 정의되어 있지 않고 실제로 사용되지 않으므로 제거됨
 
   // isRecovering가 true가 되면 startRecovery 호출
   useEffect(() => {
     if (isRecovering && selectedFile) {
+      console.log('🚀 [FRONTEND] startRecovery 호출 - 파일 경로:', selectedFile.path);
       window.api.startRecovery(selectedFile.path);
     }
   }, [isRecovering, selectedFile]);
@@ -184,7 +243,6 @@ const Recovery = () => {
     setRecoveryDone(false);
     setProgress(0);
     setTotalFiles(0);
-
   };
 
   const handleDrop = (e) => {
@@ -246,16 +304,21 @@ const Recovery = () => {
 
   // 다운로드 백엔드
   const handleDownloadConfirm = async () => {
+    if (!selectedFile || !selectedPath) {
+      alert('다운로드 경로 또는 E01 파일이 선택되지 않았습니다.');
+      return;
+    }
+
     const choice = saveFrames ? 'both' : 'video';
 
     try {
-      await window.api.invoke('run-download', {
-        analysisJsonPath: tmpJsonPath,
+      await window.api.runDownload({
+        e01Path: selectedFile,
         choice,
-        downloadPath: selectedPath
+        downloadDir: selectedPath
       });
 
-      setShowComplete(true)
+      setShowComplete(true);
     } catch (err) {
       console.error('다운로드 실패:', err);
     } finally {
@@ -302,157 +365,56 @@ const Recovery = () => {
     currentStep = 0;
   }
 
-  // 뷰정의
-
+  // view
   useEffect(() => {
-    if (!selectedAnalysisFile) return;
+    const video = document.getElementById('parser-video');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playPauseIcon = document.getElementById('playPauseIcon');
+    const replayBtn = document.getElementById('replayBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const progressBar = document.getElementById('progressBar');
+    const timeText = document.getElementById('timeText');
 
-    const waitForDOMAndSetup = () => {
-      const video = document.getElementById('parser-video');
-      const playPauseBtn = document.getElementById('playPauseBtn');
-      const playPauseIcon = document.getElementById('playPauseIcon');
-      const replayBtn = document.getElementById('replayBtn');
-      const fullscreenBtn = document.getElementById('fullscreenBtn');
-      const progressBar = document.getElementById('progressBar');
-      const timeText = document.getElementById('timeText');
+    if (!video) return;
 
-      if (!video || !playPauseBtn || !replayBtn || !fullscreenBtn || !progressBar || !timeText || !playPauseIcon) {
-        console.warn('🎥 video 또는 컨트롤 요소가 아직 없음, 재시도');
-        requestAnimationFrame(waitForDOMAndSetup);
-        return;
-      }
-
-      // 초기 상태: 재생 중이라 가정 (filter 없음)
-      playPauseIcon.style.filter = 'none';
-
-      video.onloadedmetadata = () => {
-        console.log('🎬 영상 메타데이터 로드됨');
-        console.log('📏 duration:', video.duration);
-        console.log('🎯 src:', video.src);
-
-        progressBar.max = video.duration;
-
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              console.log('▶️ 자동 재생 성공');
-              playPauseIcon.style.filter = 'none';
-            })
-            .catch((err) => {
-              console.warn('⚠️ 자동 재생 실패:', err);
-              playPauseIcon.style.filter = 'grayscale(100%) brightness(0.8)';
-            });
-        }
-      };
-
-      playPauseBtn.onclick = () => {
-        if (video.paused) {
-          video.play();
-          playPauseIcon.style.filter = 'none';
-        } else {
-          video.pause();
-          playPauseIcon.style.filter = 'grayscale(100%) brightness(0.8)';
-        }
-      };
-
-      replayBtn.onclick = () => {
-        video.currentTime = 0;
+    playPauseBtn.onclick = () => {
+      if (video.paused) {
         video.play();
-        playPauseIcon.style.filter = 'none';
-      };
-
-      fullscreenBtn.onclick = () => {
-        if (video.requestFullscreen) video.requestFullscreen();
-      };
-
-      video.ontimeupdate = () => {
-        progressBar.value = video.currentTime;
-        timeText.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-      };
-
-      progressBar.oninput = () => {
-        video.currentTime = progressBar.value;
-      };
-
-      function formatTime(seconds) {
-        const min = Math.floor(seconds / 60).toString().padStart(2, '0');
-        const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
-        return `${min}:${sec}`;
+        playPauseIcon.src = 'view_pause.svg';
+      } else {
+        video.pause();
+        playPauseIcon.src = 'view_play.svg';
       }
     };
 
-    requestAnimationFrame(waitForDOMAndSetup);
-  }, [selectedAnalysisFile]);
+    replayBtn.onclick = () => {
+      video.currentTime = 0;
+      video.play();
+    };
 
+    fullscreenBtn.onclick = () => {
+      if (video.requestFullscreen) video.requestFullscreen();
+    };
 
-  //   useEffect(() => {
-  //   const video = document.getElementById('parser-video');
-  //   const playPauseBtn = document.getElementById('playPauseBtn');
-  //   const playPauseIcon = document.getElementById('playPauseIcon');
-  //   const replayBtn = document.getElementById('replayBtn');
-  //   const fullscreenBtn = document.getElementById('fullscreenBtn');
-  //   const progressBar = document.getElementById('progressBar');
-  //   const timeText = document.getElementById('timeText');
+    video.ontimeupdate = () => {
+      progressBar.value = video.currentTime;
+      timeText.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+    };
 
-  //   if (!video) return;
+    progressBar.oninput = () => {
+      video.currentTime = progressBar.value;
+    };
 
-  //     video.onloadedmetadata = () => {
-  //     progressBar.max = video.duration;
+    video.onloadedmetadata = () => {
+      progressBar.max = video.duration;
+    };
 
-  //     // 자동재생 시도
-  //     const playPromise = video.play();
-  //     if (playPromise !== undefined) {
-  //       playPromise
-  //         .then(() => {
-  //           // 성공적으로 자동 재생됨
-  //           playPauseIcon.src = 'view_pause.svg';
-  //         })
-  //         .catch((err) => {
-  //           console.warn('⚠️ 자동 재생 실패:', err);
-  //           playPauseIcon.src = 'view_play.svg'; // 실패 시 재생 아이콘으로
-  //         });
-  //     }
-  //   };
-
-  //   playPauseBtn.onclick = () => {
-  //     if (video.paused) {
-  //       video.play();
-  //       playPauseIcon.src = 'view_pause.svg';
-  //     } else {
-  //       video.pause();
-  //       playPauseIcon.src = 'view_play.svg';
-  //     }
-  //   };
-
-  //   replayBtn.onclick = () => {
-  //     video.currentTime = 0;
-  //     video.play();
-  //   };
-
-  //   fullscreenBtn.onclick = () => {
-  //     if (video.requestFullscreen) video.requestFullscreen();
-  //   };
-
-  //   video.ontimeupdate = () => {
-  //     progressBar.value = video.currentTime;
-  //     timeText.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-  //   };
-
-  //   progressBar.oninput = () => {
-  //     video.currentTime = progressBar.value;
-  //   };
-
-  //   video.onloadedmetadata = () => {
-  //     progressBar.max = video.duration;
-  //   };
-
-  //   function formatTime(seconds) {
-  //     const min = Math.floor(seconds / 60).toString().padStart(2, '0');
-  //     const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
-  //     return `${min}:${sec}`;
-  //   }
-  // }, []); // 컴포넌트가 mount될 때 1번만 실행
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
+      return `${min}:${sec}`;
+    }
+  }, []); // 컴포넌트가 mount될 때 1번만 실행
 
   const startRecoveryFromDownload = () => {
     setShowDownloadPopup(false);
@@ -847,7 +809,24 @@ const Recovery = () => {
                                     >
                                       {file.name}
                                     </button>
-                                    {slackRatePercent > 0 && <Badge label="슬랙 포함" />}
+                                    {slackRatePercent > 0 && (
+                                      <Badge
+                                        label="슬랙"
+                                        onClick={() => {
+                                          const slackPath = file.slack_info?.output_path;
+                                          if (!slackPath) {
+                                            return;
+                                          }
+
+                                          const formatted = `file:///${slackPath.replace(/\\/g, '/')}`;
+                                          console.log('🎯 슬랙 영상 경로:', formatted);
+
+                                          setSlackVideoSrc(formatted);  // ✅ 슬랙 영상 경로 저장
+                                          setShowSlackPopup(true);      // ✅ 팝업 열기
+                                        }}
+                                        style={{ cursor: 'pointer' }}
+                                      />
+                                    )}
                                   </div>
                                   <br />
                                   {mb} MB ・ 슬랙비율 {slackRatePercent} %
@@ -880,7 +859,6 @@ const Recovery = () => {
         ) : null
         }
       </Box>
-
       {showAlert && (
         <Alert
           icon={alertIcon}
@@ -895,6 +873,40 @@ const Recovery = () => {
         >
           <Button variant="dark" onClick={() => setShowAlert(false)}>다시 선택</Button>
         </Alert>
+      )}
+
+      {showSlackPopup && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div style={{ position: 'absolute', top: '20px', right: '30px' }}>
+            <Button variant="gray" onClick={() => setShowSlackPopup(false)}>
+              닫기
+            </Button>
+          </div>
+          <video
+            preload="metadata"
+            controls
+            style={{
+              width: '90vw',
+              height: '80vh',
+              backgroundColor: 'black',
+              borderRadius: '12px',
+            }}
+            src={slackVideoSrc}  // ✅ 핵심 수정
+          />
+        </div>
       )}
 
       {showDownloadPopup && (
@@ -934,6 +946,7 @@ const Recovery = () => {
                   readOnly
                   className="custom-path-input"
                   style={{ flex: 1 }}
+                  placeholder="경로를 지정해주세요"
                 />
                 <Button variant="gray" onClick={handlePathSelect}>
                   경로 지정

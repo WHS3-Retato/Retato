@@ -105,7 +105,7 @@ def analyze_mp4_slack(file_path):
         slack_bytes = total_slack
 
     valid_bytes = size - slack_bytes
-    slack_pct   = round(slack_bytes / size * 100, 2)
+    slack_pct   = round(slack_bytes / size, 4)  # 0~1 범위로 반환
 
     return {
         "total_bytes":        size,
@@ -154,7 +154,7 @@ def analyze_avi_slack(file_path):
         slack_regions.append((riff_end, file_size))
 
     slack_bytes = sum(end - start for start, end in slack_regions)
-    slack_pct   = round(slack_bytes / file_size * 100, 2)
+    slack_pct   = round(slack_bytes / file_size, 4)  # 0~1 범위로 반환
 
     return {
         "total_bytes":        file_size,
