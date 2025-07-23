@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron'); // ✅ 한 줄에 다 합침
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const readline = require('readline');
@@ -6,6 +6,7 @@ const drivelist = require('drivelist');
 const checkDiskSpace = require('check-disk-space').default;
 const fs = require('fs').promises;
 const fssync = require('fs');
+
 
 let mainWindow = null;
 
@@ -102,11 +103,25 @@ function createWindow() {
     },
   });
 
+  
+
   mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
   startDrivePolling();
 }
 
-app.whenReady().then(createWindow);
+// view
+app.whenReady().then(() => {
+  // ✅ stream 프로토콜 등록
+  protocol.interceptFileProtocol('stream', (request, callback) => {
+    const url = request.url.substr(9); // 'stream://' 제거
+    const decodedPath = decodeURIComponent(url);
+    console.log('📦 stream 요청:', decodedPath);
+    callback({ path: decodedPath });
+  });
+
+  // 기존 창 생성
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -232,3 +247,4 @@ ipcMain.handle('dialog:openE01File', async () => {
   // 선택 취소 시 []
   return result.canceled ? null : result.filePaths[0];
 });
+

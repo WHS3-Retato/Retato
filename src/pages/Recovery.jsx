@@ -122,6 +122,7 @@ const Recovery = () => {
     // prefix 기본 매핑
     const prefix = Object.keys(categoryIcons).find((k) =>
       cat.startsWith(k)
+    
     );
     return prefix ? categoryIcons[prefix] : slackIcon;
   };
@@ -183,9 +184,7 @@ const Recovery = () => {
     setRecoveryDone(false);
     setProgress(0);
     setTotalFiles(0);
-    window.api
-      .startRecovery(file.path)
-      .catch(err => console.error('🤖 startRecovery error:', err));
+    
   };
 
   const handleDrop = (e) => {
@@ -303,56 +302,157 @@ const Recovery = () => {
     currentStep = 0;
   }
 
-  // view
-  useEffect(() => {
-  const video = document.getElementById('parser-video');
-  const playPauseBtn = document.getElementById('playPauseBtn');
-  const playPauseIcon = document.getElementById('playPauseIcon');
-  const replayBtn = document.getElementById('replayBtn');
-  const fullscreenBtn = document.getElementById('fullscreenBtn');
-  const progressBar = document.getElementById('progressBar');
-  const timeText = document.getElementById('timeText');
+  // 뷰정의
 
-  if (!video) return;
+useEffect(() => {
+  if (!selectedAnalysisFile) return;
 
-  playPauseBtn.onclick = () => {
-    if (video.paused) {
+  const waitForDOMAndSetup = () => {
+    const video = document.getElementById('parser-video');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playPauseIcon = document.getElementById('playPauseIcon');
+    const replayBtn = document.getElementById('replayBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const progressBar = document.getElementById('progressBar');
+    const timeText = document.getElementById('timeText');
+
+    if (!video || !playPauseBtn || !replayBtn || !fullscreenBtn || !progressBar || !timeText || !playPauseIcon) {
+      console.warn('🎥 video 또는 컨트롤 요소가 아직 없음, 재시도');
+      requestAnimationFrame(waitForDOMAndSetup);
+      return;
+    }
+
+    // 초기 상태: 재생 중이라 가정 (filter 없음)
+    playPauseIcon.style.filter = 'none';
+
+    video.onloadedmetadata = () => {
+      console.log('🎬 영상 메타데이터 로드됨');
+      console.log('📏 duration:', video.duration);
+      console.log('🎯 src:', video.src);
+
+      progressBar.max = video.duration;
+
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('▶️ 자동 재생 성공');
+            playPauseIcon.style.filter = 'none';
+          })
+          .catch((err) => {
+            console.warn('⚠️ 자동 재생 실패:', err);
+            playPauseIcon.style.filter = 'grayscale(100%) brightness(0.8)';
+          });
+      }
+    };
+
+    playPauseBtn.onclick = () => {
+      if (video.paused) {
+        video.play();
+        playPauseIcon.style.filter = 'none';
+      } else {
+        video.pause();
+        playPauseIcon.style.filter = 'grayscale(100%) brightness(0.8)';
+      }
+    };
+
+    replayBtn.onclick = () => {
+      video.currentTime = 0;
       video.play();
-      playPauseIcon.src = 'view_pause.svg';
-    } else {
-      video.pause();
-      playPauseIcon.src = 'view_play.svg';
+      playPauseIcon.style.filter = 'none';
+    };
+
+    fullscreenBtn.onclick = () => {
+      if (video.requestFullscreen) video.requestFullscreen();
+    };
+
+    video.ontimeupdate = () => {
+      progressBar.value = video.currentTime;
+      timeText.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+    };
+
+    progressBar.oninput = () => {
+      video.currentTime = progressBar.value;
+    };
+
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
+      return `${min}:${sec}`;
     }
   };
 
-  replayBtn.onclick = () => {
-    video.currentTime = 0;
-    video.play();
-  };
+  requestAnimationFrame(waitForDOMAndSetup);
+}, [selectedAnalysisFile]);
 
-  fullscreenBtn.onclick = () => {
-    if (video.requestFullscreen) video.requestFullscreen();
-  };
 
-  video.ontimeupdate = () => {
-    progressBar.value = video.currentTime;
-    timeText.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-  };
+//   useEffect(() => {
+//   const video = document.getElementById('parser-video');
+//   const playPauseBtn = document.getElementById('playPauseBtn');
+//   const playPauseIcon = document.getElementById('playPauseIcon');
+//   const replayBtn = document.getElementById('replayBtn');
+//   const fullscreenBtn = document.getElementById('fullscreenBtn');
+//   const progressBar = document.getElementById('progressBar');
+//   const timeText = document.getElementById('timeText');
 
-  progressBar.oninput = () => {
-    video.currentTime = progressBar.value;
-  };
+//   if (!video) return;
 
-  video.onloadedmetadata = () => {
-    progressBar.max = video.duration;
-  };
+//     video.onloadedmetadata = () => {
+//     progressBar.max = video.duration;
 
-  function formatTime(seconds) {
-    const min = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
-    return `${min}:${sec}`;
-  }
-}, []); // 컴포넌트가 mount될 때 1번만 실행
+//     // 자동재생 시도
+//     const playPromise = video.play();
+//     if (playPromise !== undefined) {
+//       playPromise
+//         .then(() => {
+//           // 성공적으로 자동 재생됨
+//           playPauseIcon.src = 'view_pause.svg';
+//         })
+//         .catch((err) => {
+//           console.warn('⚠️ 자동 재생 실패:', err);
+//           playPauseIcon.src = 'view_play.svg'; // 실패 시 재생 아이콘으로
+//         });
+//     }
+//   };
+
+//   playPauseBtn.onclick = () => {
+//     if (video.paused) {
+//       video.play();
+//       playPauseIcon.src = 'view_pause.svg';
+//     } else {
+//       video.pause();
+//       playPauseIcon.src = 'view_play.svg';
+//     }
+//   };
+
+//   replayBtn.onclick = () => {
+//     video.currentTime = 0;
+//     video.play();
+//   };
+
+//   fullscreenBtn.onclick = () => {
+//     if (video.requestFullscreen) video.requestFullscreen();
+//   };
+
+//   video.ontimeupdate = () => {
+//     progressBar.value = video.currentTime;
+//     timeText.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+//   };
+
+//   progressBar.oninput = () => {
+//     video.currentTime = progressBar.value;
+//   };
+
+//   video.onloadedmetadata = () => {
+//     progressBar.max = video.duration;
+//   };
+
+//   function formatTime(seconds) {
+//     const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+//     const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
+//     return `${min}:${sec}`;
+//   }
+// }, []); // 컴포넌트가 mount될 때 1번만 실행
 
   const startRecoveryFromDownload = () => {
     setShowDownloadPopup(false);  
@@ -505,22 +605,48 @@ const Recovery = () => {
         </div>
 
         <div className="result-scroll-area">
-          {/* View */}
+          {/* 뷰위치 */}
           <div className="video-container">
             <video
               id="parser-video"
               preload="metadata"
-              src={`/stream/${encodeURIComponent(selectedAnalysisFile)}`}
-            ></video>
+              controls
+              style={{
+                width: '100%',
+                maxWidth: '1200px',
+                height: 'auto',
+                backgroundColor: 'white',
+              }}
+              src={
+              results.find(f => f.name === selectedAnalysisFile)?.origin_video
+                ? `file:///${results
+                    .find(f => f.name === selectedAnalysisFile)
+                    .origin_video.replace(/\\/g, '/')}`
+                : ''
+            }
+                         ></video>
 
             <div className="parser-controls">
               <button id="replayBtn">
                 <img src={replayIcon} alt="Replay" />
               </button>
-              <button id="playPauseBtn">
-                <img id="playPauseIcon" src={pauseIcon} alt="Pause" />
+              <button
+                id="playPauseBtn"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <img
+                  id="playPauseIcon"
+                  src={pauseIcon}
+                  alt="Pause"
+                  style={{
+                    width: '30px',
+                    transition: 'filter 0.2s',
+                    filter: 'none', // 초기값: 원래색
+                  }}
+                />
               </button>
-              <input type="range" id="progressBar" min="0" value="0" step="0.01" />
+
+              <input type="range" id="progressBar" min="0" defaultValue="0" step="0.01" />
               <span id="timeText">00:00 / 00:00</span>
               <button id="fullscreenBtn">
                 <img src={fullscreenIcon} alt="Fullscreen" />
@@ -567,19 +693,13 @@ const Recovery = () => {
                 <span className="parser-info-label">파일 포맷:</span>
                 <span className="parser-info-value">{analysis.basic.format}</span>
               </div>
-              {Object.entries(analysis.basic.timestamps).map(([key, ts]) => {
-                const labelMap = {
-                  created: '생성 시간',
-                  modified: '수정 시간',
-                  accessed: '마지막 접근 시간',
-                };
-                return (
-                  <div className="parser-info-row" key={key}>
-                    <span className="parser-info-label">{labelMap[key]}:</span>
-                    <span className="parser-info-value">{ts}</span>
-                  </div>
-                );
-              })}
+
+              {/* 파일시스템에서 시간 파싱하지 말고 복구 시간만 표시하기 */}
+              <div className="parser-info-row">
+                <span className="parser-info-label">복구 시간:</span>
+                <span className="parser-info-value">{analysis.basic.timestamps.created}</span>
+              </div>
+
               <div className="parser-info-row">
                 <span className="parser-info-label">파일 크기:</span>
                 <span className="parser-info-value">
@@ -719,17 +839,16 @@ const Recovery = () => {
                       
                       return (
                         <div className="result-file-item" key={file.path}>
-                          <input
-                            className="result-checkbox"
-                            type="checkbox"
-                          />
                           <div className="result-file-info">
-                            <button
-                              className="text-button"
-                              onClick={() => handleFileClick(file.name)}
-                            >
-                              {file.name}
-                            </button>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <button
+                                  className="text-button"
+                                  onClick={() => handleFileClick(file.name)}
+                                >
+                                  {file.name}
+                                </button>
+                                {slackRatePercent > 0 && <Badge label="슬랙 포함" />}
+                              </div>
                             <br />
                             {mb} MB ・ 슬랙비율: {slackRatePercent} %
                           </div>

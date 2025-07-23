@@ -1,9 +1,15 @@
 import os
 import sys
+
+# ✅ 1. 루트 경로 삽입: D:/Retato/app
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# ✅ 2. 이제서야 import
 import json
 import shutil
 from python_engine.core.image_loader.e01_parser import extract_videos_from_e01
 from python_engine.core.output.download_frame import download_frames
+
 
 def main(e01_path, choice=None, download_dir=None):
     # 1) 추출 & 복원
