@@ -6,6 +6,7 @@ const drivelist = require('drivelist');
 const checkDiskSpace = require('check-disk-space').default;
 const fs = require('fs').promises;
 const fssync = require('fs');
+const os = require('os');
 
 let mainWindow = null;
 
@@ -175,7 +176,6 @@ ipcMain.handle('start-recovery', (_event, e01FilePath) => {
 
         // 1) 진행률 이벤트
         if (data.processed !== undefined && data.total !== undefined) {
-          console.log('✔ parsed progress:', data.processed, data.total);
           mainWindow.webContents.send('recovery-progress', {
             processed: data.processed,
             total: data.total
@@ -186,6 +186,8 @@ ipcMain.handle('start-recovery', (_event, e01FilePath) => {
         // 2) analysisPath 이벤트
         if (data.analysisPath) {
           console.log('✔ got analysisPath:', data.analysisPath);
+          const tempDir = path.dirname(data.analysisPath);
+          mainWindow.webContents.send('analysis-path', tempDir);
           try {
             const raw = await fs.readFile(data.analysisPath, 'utf8');
             const results = JSON.parse(raw);
@@ -216,6 +218,71 @@ ipcMain.handle('start-recovery', (_event, e01FilePath) => {
   });
 });
 
+ipcMain.handle('run-download', (_event, { e01Path, choice, downloadDir }) => {
+  // 1) 호출된 인자 찍기
+  console.log('▶ run-download called with', {
+    e01Path, choice, downloadDir
+  });
+
+  // 2) 인자 유효성 검사
+  if (
+    typeof e01Path !== 'string' ||
+    typeof choice !== 'string' ||
+    typeof downloadDir !== 'string' ||
+    !e01Path.trim() ||
+    !choice.trim() ||
+    !downloadDir.trim()
+  ) {
+    console.error('❌ run-download invalid args:', {
+      e01Path, choice, downloadDir
+    });
+    // 에러 전송 시에도 어떤 인자가 잘못됐는지 명확히
+    mainWindow.webContents.send(
+      'download-error',
+      `Invalid args for run-download: ${JSON.stringify({ e01Path, choice, downloadDir })}`
+    );
+    throw new Error('run-download: invalid args');
+  }
+
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, 'python_engine', 'main.py');
+    const env = { ...process.env, PYTHONPATH: __dirname };
+    const args = [scriptPath, e01Path, choice, downloadDir];
+
+    console.log('▶ spawning python with args:', args);
+
+    const python = spawn('python', args, {
+      cwd: path.join(__dirname, 'python_engine'),
+      shell: true,
+      env,
+    });
+
+    const rl = readline.createInterface({ input: python.stdout });
+    rl.on('line', line => {
+      console.log('⭸ download line:', line);
+      mainWindow.webContents.send('download-log', line);
+    });
+
+    python.stderr.on('data', buf => {
+      const msg = buf.toString();
+      console.error('Python stderr (download):', msg);
+      mainWindow.webContents.send('download-error', msg);
+    });
+
+    python.on('close', code => {
+      console.log('🔚 download python exited with code', code);
+      rl.close();
+      if (code === 0) {
+        resolve();
+      } else {
+
+        const err = new Error(`run-download exit ${code} with args ${JSON.stringify(args)}`);
+        reject(err);
+      }
+    });
+  });
+});
+
 ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory']  
@@ -223,12 +290,30 @@ ipcMain.handle('dialog:openDirectory', async () => {
   return result;
 });
 
+ipcMain.handle('clear-cache', async () => {
+  const tempDir = os.tmpdir();
+  const files = fssync.readdirSync(tempDir);
+  let deleted = 0;
+  for (const file of files) {
+    if (file.startsWith('retato_')) {
+      const fullPath = path.join(tempDir, file);
+      try {
+        fssync.rmSync(fullPath, { recursive: true, force: true });
+        deleted++;
+      } catch (e) {
+        // 무시
+      }
+    }
+  }
+  return deleted;
+});
+
 ipcMain.handle('dialog:openE01File', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'E01 파일 선택',
-    filters: [{ name: 'E01 files', extensions: ['e01'] }],
-    properties: ['openFile']
+    filters: [{ name: 'E01 Files', extensions: ['e01'] }],
+    properties: ['openFile'],
   });
-  // 선택 취소 시 []
-  return result.canceled ? null : result.filePaths[0];
+  if (canceled) return null;
+  return filePaths[0];  // 선택된 파일 경로 하나 반환
 });

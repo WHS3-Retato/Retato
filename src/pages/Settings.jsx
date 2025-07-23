@@ -13,10 +13,13 @@ const Settings = () => {
 
   const [showCacheMessage, setShowCacheMessage] = useState(false);
 
-  const handleCacheClear = () => {
-  setShowCacheMessage(true);
-  setTimeout(() => setShowCacheMessage(false), 4000); // 4초 후 메시지 숨김
-};
+  const handleCacheClear = async () => {
+    if (window.api?.clearCache) {
+      await window.api.clearCache();
+    }
+    setShowCacheMessage(true);
+    setTimeout(() => setShowCacheMessage(false), 4000);
+  };
 
   return (
     <div className="settings_page">

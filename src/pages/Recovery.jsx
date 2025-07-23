@@ -39,7 +39,7 @@ const Recovery = () => {
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [saveFrames, setSaveFrames] = useState(false);
-  const [selectedPath, setSelectedPath] = useState("C:\\Users\\Downloads");
+  const [selectedPath, setSelectedPath] = useState("");
 
   const [isRecovering, setIsRecovering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -48,6 +48,9 @@ const Recovery = () => {
 
   const [results, setResults] = useState([]);
   const [openGroups, setOpenGroups] = useState({});
+
+  const [tempOutputDir, setTempOutputDir] = useState(null);
+
   function groupByCategory(list) {
     return list.reduce((acc, file) => {
       const cat = file.path.split(/[/\\]/)[1] || 'unknown'
@@ -154,10 +157,25 @@ const Recovery = () => {
   }, []);
 
   useEffect(() => {
-    const init = {}
-    Object.keys(groupedResults).forEach(cat => { init[cat] = true })
-    setOpenGroups(init)
-  }, [groupedResults])
+    const offPath = window.api.onAnalysisPath(path => {
+      console.log('analysisPath:', path);
+      setTempOutputDir(path);
+    });
+    return () => offPath();
+  }, []);
+
+  useEffect(() => {
+    const offLog = window.api.onDownloadLog(line => {
+      console.log('다운로드 로그:', line);
+    });
+    const offErr = window.api.onDownloadError(err => {
+      console.error('다운로드 에러:', err);
+    });
+    return () => {
+      offLog();
+      offErr();
+    };
+  }, []);
 
   // isRecovering가 true가 되면 startRecovery 호출
   useEffect(() => {
@@ -183,9 +201,6 @@ const Recovery = () => {
     setRecoveryDone(false);
     setProgress(0);
     setTotalFiles(0);
-    window.api
-      .startRecovery(file.path)
-      .catch(err => console.error('🤖 startRecovery error:', err));
   };
 
   const handleDrop = (e) => {
@@ -241,22 +256,29 @@ const Recovery = () => {
   };
 
   const handleFolderSelect = async () => {
-    const path = await window.electronAPI.selectFolder();
-    if (path) setSelectedPath(path);
+    const result = await window.api.openDirectory();
+    if (!result.canceled && result.filePaths.length > 0) {
+      setSelectedPath(result.filePaths[0]);
+    }
   };
 
   // 다운로드 백엔드
-  const handleDownloadConfirm =  async() => {
+  const handleDownloadConfirm = async () => {
+    if (!selectedFile || !tempOutputDir || !selectedPath) {
+      alert('다운로드 경로 또는 임시 폴더가 올바르지 않습니다.');
+      return;
+    }
+
     const choice = saveFrames ? 'both' : 'video';
 
     try {
-      await window.api.invoke('run-download', {
-        analysisJsonPath: tmpJsonPath,
-        choice,
-        downloadPath: selectedPath
+      await window.api.runDownload({
+        e01Path: tempOutputDir,  
+        choice,                       
+        downloadDir: selectedPath   
       });
 
-      setShowComplete(true)
+      setShowComplete(true);
     } catch (err) {
       console.error('다운로드 실패:', err);
     } finally {
@@ -276,17 +298,9 @@ const Recovery = () => {
   };
 
   const handlePathSelect = async () => {
-    const result = await window.api.selectFolder();  // api로 접근
-    let dir;
-
-    if (result && !result.canceled && result.filePaths.length > 0) {
-      dir = result.filePaths[0];
-    } else {
-      dir = await window.api.invoke('select-download-dir');
-    }
-
-    if (dir) {
-      setSelectedPath(dir);
+    const result = await window.api.openDirectory();
+    if (!result.canceled && result.filePaths.length > 0) {
+      setSelectedPath(result.filePaths[0]);
     }
   };
 
@@ -415,7 +429,7 @@ const Recovery = () => {
           alignItems: 'center',
           flexDirection: 'column',
         }}>
-          <img src={completeIcon} alt="완료 아이콘" style={{ width: '100px', margin: '3rem 0', marginTop:'5rem'}} />
+          <img src={completeIcon} alt="완료 아이콘" style={{ width: '100px', margin: '3rem 0', marginTop:'6rem'}} />
         </div>
         <p style={{ textAlign: 'center', fontSize: '1rem' }}>
           선택된 경로에 복원된 영상이 저장되었습니다.
@@ -731,7 +745,7 @@ const Recovery = () => {
                               {file.name}
                             </button>
                             <br />
-                            {mb} MB ・ 슬랙비율: {slackRatePercent} %
+                            {mb} ・ 슬랙비율: {slackRatePercent} %
                           </div>
                         </div>
                       )
@@ -815,6 +829,7 @@ const Recovery = () => {
               readOnly
               className="custom-path-input"
               style={{ flex: 1 }}
+              placeholder="경로를 지정해주세요"
             />
             <Button variant="gray" onClick={handlePathSelect}>
               경로 지정
