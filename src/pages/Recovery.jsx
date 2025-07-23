@@ -6,8 +6,8 @@ import Button from '../components/Button.jsx';
 import Alert from '../components/Alert.jsx';
 import Badge from '../components/Badge.jsx';
 import Potato from '../components/Potato.jsx';
-import '../styles/Stepbar.css';
-import '../styles/Recovery.css';
+import '../styles/Stepbar.css';  
+import '../styles/Recovery.css'; 
 import '../styles/Button.css';
 import '../styles/Alert.css';
 import alertIcon from '../images/alert_file.svg';
@@ -39,7 +39,7 @@ const Recovery = () => {
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [saveFrames, setSaveFrames] = useState(false);
-  const [selectedPath, setSelectedPath] = useState("");
+  const [selectedPath, setSelectedPath] = useState("C:\\Users\\Downloads");
 
   const [isRecovering, setIsRecovering] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -50,20 +50,6 @@ const Recovery = () => {
 
   const [results, setResults] = useState([]);
   const [openGroups, setOpenGroups] = useState({});
-
-  const [slackVideoSrc, setSlackVideoSrc] = useState('');
-
-  // results 상태 변경 감지
-  useEffect(() => {
-    console.log('📊 [FRONTEND] Results 상태 업데이트됨!');
-    console.log('📊 [FRONTEND] Results 길이:', results.length);
-    results.forEach((result, index) => {
-      const slackRate = result.slack_info?.slack_rate;
-      const displayRate = slackRate !== null && slackRate !== undefined ? slackRate : 'N/A';
-      console.log(`📊 [FRONTEND] Result ${index + 1}: ${result.name} - Slack Rate: ${displayRate}`);
-    });
-  }, [results]);
-
   function groupByCategory(list) {
     return list.reduce((acc, file) => {
       const cat = file.path.split(/[/\\]/)[1] || 'unknown'
@@ -74,14 +60,16 @@ const Recovery = () => {
   }
   const groupedResults = useMemo(() => groupByCategory(results), [results])
 
-  const [selectedAnalysisFile, setSelectedAnalysisFile] = useState(null);
+  const [selectedAnalysisFile, setSelectedAnalysisFile] = useState(null); 
   const [activeTab, setActiveTab] = useState('basic');
   const [showComplete, setShowComplete] = useState(false);
   const [showDownloadAlert, setShowDownloadAlert] = useState(false);
-
+  
   const location = useLocation();
   const initialFile = location.state?.e01File || null;
-  const autoStart = location.state?.autoStart || false;
+  const autoStart   = location.state?.autoStart || false;
+
+  const [slackVideoSrc, setSlackVideoSrc] = useState('');
 
   // 바이트 → MB 변환
   const bytesToMB = (bytes) => (bytes / 1024 / 1024).toFixed(1) + ' MB';
@@ -98,22 +86,13 @@ const Recovery = () => {
   );
 
   const slack_info = analysis?.slack_info ?? { slack_rate: 0 };
-  const safeSlackRate = slack_info.slack_rate ?? 0;
-
-  // slackRatePercent와 동일한 방식으로 계산
-  let slackPercent = 'N/A';
-  if (safeSlackRate !== null && safeSlackRate !== undefined && typeof safeSlackRate === 'number') {
-    slackPercent = safeSlackRate <= 1
-      ? (safeSlackRate * 100).toFixed(1)
-      : safeSlackRate.toFixed(1);
-  }
-
-  const validPercent = (100 - safeSlackRate * 100).toFixed(1);
+  const slackPercent = (slack_info.slack_rate * 100).toFixed(1);
+  const validPercent = (100 - slack_info.slack_rate * 100).toFixed(1);
 
   useEffect(() => {
     if (progress >= 100) {
       setIsRecovering(false);
-      setRecoveryDone(true);
+      setRecoveryDone(true); 
     }
 
     setHistory(prev => [...prev, 'result']);
@@ -147,6 +126,7 @@ const Recovery = () => {
     // prefix 기본 매핑
     const prefix = Object.keys(categoryIcons).find((k) =>
       cat.startsWith(k)
+    
     );
     return prefix ? categoryIcons[prefix] : slackIcon;
   };
@@ -155,73 +135,38 @@ const Recovery = () => {
   useEffect(() => {
     console.log('📡 onProgress useEffect mounted');
     const offProg = window.api.onProgress(({ processed, total }) => {
-      console.log('📈 [FRONTEND] progress event - processed:', processed, 'total:', total);
+      console.log('📈 progress event', processed, total);
       setTotalFiles(total);
       setProgress(Math.floor((processed / total) * 100));
-    });
-    const offDone = window.api.onDone(() => {
-      console.log('✅ [FRONTEND] recovery done event');
-      setProgress(100);
-      setIsRecovering(false);
-      setRecoveryDone(true);
-    });
-    return () => { offProg(); offDone(); };
-  }, []);
+  });
+  const offDone = window.api.onDone(() => {
+    console.log('✅ recovery done event');
+    setProgress(100);
+    setIsRecovering(false);
+    setRecoveryDone(true);
+  });
+  return () => { offProg(); offDone(); };
+}, []);
 
   useEffect(() => {
     console.log('📡 onResults listener registered')
     const off = window.api.onResults(data => {
-      console.log('📥 [FRONTEND] =========================== 데이터 수신 ===========================');
-      console.log('📥 [FRONTEND] onResults 받은 전체 데이터:', data);
-      console.log('📥 [FRONTEND] 데이터 타입:', typeof data);
-      console.log('📥 [FRONTEND] 배열 여부:', Array.isArray(data));
-
-      if (Array.isArray(data)) {
-        console.log('📥 [FRONTEND] 총 파일 개수:', data.length);
-        console.log('📥 [FRONTEND] ==================== 각 파일별 상세 정보 ====================');
-
-        data.forEach((item, index) => {
-          console.log(`📥 [FRONTEND] ========== 파일 ${index + 1} ==========`);
-          console.log(`📥 [FRONTEND] 파일명: ${item.name}`);
-          console.log(`📥 [FRONTEND] 경로: ${item.path}`);
-          console.log(`📥 [FRONTEND] 크기: ${item.size} bytes`);
-
-          if (item.slack_info) {
-            console.log(`📥 [FRONTEND] 🔥 SLACK INFO 존재!`);
-            console.log(`📥 [FRONTEND] 🔥 Slack Rate: ${item.slack_info.slack_rate}`);
-            console.log(`📥 [FRONTEND] 🔥 Slack Info 전체:`, item.slack_info);
-          } else {
-            console.log(`📥 [FRONTEND] ⚠️ SLACK INFO 없음!`);
-          }
-
-          if (item.analysis) {
-            console.log(`📥 [FRONTEND] Analysis 존재:`, Object.keys(item.analysis));
-          } else {
-            console.log(`📥 [FRONTEND] Analysis 없음`);
-          }
-
-          console.log(`📥 [FRONTEND] 전체 항목 ${index + 1}:`, JSON.stringify(item, null, 2));
-        });
-      } else if (data.error) {
-        console.error('📥 [FRONTEND] 에러 받음:', data.error);
-        setResultError(data.error);
-      } else {
-        console.log('📥 [FRONTEND] 단일 객체:', JSON.stringify(data, null, 2));
-      }
-
+      console.log('📥 [Debug] onResults data:', data)
       if (data.error) setResultError(data.error);
       else setResults(data);
     });
     return off;
   }, []);
 
-  // onAnalysisPath, onDownloadLog, onDownloadError 리스너들은 
-  // preload.js에 정의되어 있지 않고 실제로 사용되지 않으므로 제거됨
+  useEffect(() => {
+    const init = {}
+    Object.keys(groupedResults).forEach(cat => { init[cat] = true })
+    setOpenGroups(init)
+  }, [groupedResults])
 
   // isRecovering가 true가 되면 startRecovery 호출
   useEffect(() => {
     if (isRecovering && selectedFile) {
-      console.log('🚀 [FRONTEND] startRecovery 호출 - 파일 경로:', selectedFile.path);
       window.api.startRecovery(selectedFile.path);
     }
   }, [isRecovering, selectedFile]);
@@ -243,6 +188,7 @@ const Recovery = () => {
     setRecoveryDone(false);
     setProgress(0);
     setTotalFiles(0);
+    
   };
 
   const handleDrop = (e) => {
@@ -282,7 +228,7 @@ const Recovery = () => {
   };
 
   const handleDownload = () => {
-    setShowDownloadPopup(true);
+    setShowDownloadPopup(true); 
   };
 
   const closeDownloadPopup = () => {
@@ -303,22 +249,17 @@ const Recovery = () => {
   };
 
   // 다운로드 백엔드
-  const handleDownloadConfirm = async () => {
-    if (!selectedFile || !selectedPath) {
-      alert('다운로드 경로 또는 E01 파일이 선택되지 않았습니다.');
-      return;
-    }
-
+  const handleDownloadConfirm =  async() => {
     const choice = saveFrames ? 'both' : 'video';
 
     try {
-      await window.api.runDownload({
-        e01Path: selectedFile,
+      await window.api.invoke('run-download', {
+        analysisJsonPath: tmpJsonPath,
         choice,
-        downloadDir: selectedPath
+        downloadPath: selectedPath
       });
 
-      setShowComplete(true);
+      setShowComplete(true)
     } catch (err) {
       console.error('다운로드 실패:', err);
     } finally {
@@ -331,10 +272,10 @@ const Recovery = () => {
   };
 
   const handleFileClick = (filename) => {
-    setSelectedAnalysisFile(filename);
-    setActiveTab('basic');
+    setSelectedAnalysisFile(filename);   
+    setActiveTab('basic'); 
     setHistory(prev => [...prev, 'parser']);
-    setView('parser');
+    setView('parser');            
   };
 
   const handlePathSelect = async () => {
@@ -365,8 +306,12 @@ const Recovery = () => {
     currentStep = 0;
   }
 
-  // view
-  useEffect(() => {
+  // 뷰정의
+
+useEffect(() => {
+  if (!selectedAnalysisFile) return;
+
+  const waitForDOMAndSetup = () => {
     const video = document.getElementById('parser-video');
     const playPauseBtn = document.getElementById('playPauseBtn');
     const playPauseIcon = document.getElementById('playPauseIcon');
@@ -375,21 +320,46 @@ const Recovery = () => {
     const progressBar = document.getElementById('progressBar');
     const timeText = document.getElementById('timeText');
 
-    if (!video) return;
+    if (!video || !playPauseBtn || !replayBtn || !fullscreenBtn || !progressBar || !timeText || !playPauseIcon) {
+      console.warn('🎥 video 또는 컨트롤 요소가 아직 없음, 재시도');
+      requestAnimationFrame(waitForDOMAndSetup);
+      return;
+    }
+
+    // 초기 상태: 재생 중이라 가정 (filter 없음)
+    playPauseIcon.style.filter = 'none';
+
+    video.onloadedmetadata = () => {
+      progressBar.max = video.duration;
+
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('▶️ 자동 재생 성공');
+            playPauseIcon.style.filter = 'none';
+          })
+          .catch((err) => {
+            console.warn('⚠️ 자동 재생 실패:', err);
+            playPauseIcon.style.filter = 'grayscale(100%) brightness(0.8)';
+          });
+      }
+    };
 
     playPauseBtn.onclick = () => {
       if (video.paused) {
         video.play();
-        playPauseIcon.src = 'view_pause.svg';
+        playPauseIcon.style.filter = 'none';
       } else {
         video.pause();
-        playPauseIcon.src = 'view_play.svg';
+        playPauseIcon.style.filter = 'grayscale(100%) brightness(0.8)';
       }
     };
 
     replayBtn.onclick = () => {
       video.currentTime = 0;
       video.play();
+      playPauseIcon.style.filter = 'none';
     };
 
     fullscreenBtn.onclick = () => {
@@ -405,24 +375,24 @@ const Recovery = () => {
       video.currentTime = progressBar.value;
     };
 
-    video.onloadedmetadata = () => {
-      progressBar.max = video.duration;
-    };
-
     function formatTime(seconds) {
       const min = Math.floor(seconds / 60).toString().padStart(2, '0');
       const sec = Math.floor(seconds % 60).toString().padStart(2, '0');
       return `${min}:${sec}`;
     }
-  }, []); // 컴포넌트가 mount될 때 1번만 실행
+  };
+
+  requestAnimationFrame(waitForDOMAndSetup);
+}, [selectedAnalysisFile]);
+
 
   const startRecoveryFromDownload = () => {
     setShowDownloadPopup(false);
-    setShowComplete(false);
-    setIsRecovering(true);
+    setShowComplete(false);   
+    setIsRecovering(true); 
     setCurrentCount(0);
     setProgress(0);
-    setTotalFiles(300);
+    setTotalFiles(300);      
   };
 
   // closeButton -> Result 뒤로가기
@@ -464,456 +434,458 @@ const Recovery = () => {
 
 
   return (
+  <>
+  <Stepbar currentStep={currentStep} />
+  <Box>
+    {showComplete ? (
     <>
-      <Stepbar currentStep={currentStep} />
-      <Box>
-        {showComplete ? (
-          <>
-            <h1 className="upload-title">Result</h1>
-            <div className="recovery-complete-area">
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                flexDirection: 'column',
-              }}>
-                <img src={completeIcon} alt="완료 아이콘" style={{ width: '100px', margin: '3rem 0', marginTop: '5rem' }} />
-              </div>
-              <p style={{ textAlign: 'center', fontSize: '1rem' }}>
-                선택된 경로에 복원된 영상이 저장되었습니다.
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
-                <Button variant="dark" onClick={() => navigate('/')}>홈으로</Button>
-              </div>
-            </div>
-          </>
-        ) : isRecovering ? (
-          <>
-            <h1 className="upload-title">File Recovery</h1>
-            <p className="recovery-desc-left">잠시만 기다려 주세요… 영상을 복원하고 있어요</p>
+      <h1 className="upload-title">Result</h1>
+      <div className="recovery-complete-area">
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexDirection: 'column',
+        }}>
+          <img src={completeIcon} alt="완료 아이콘" style={{ width: '100px', margin: '3rem 0', marginTop:'5rem'}} />
+        </div>
+        <p style={{ textAlign: 'center', fontSize: '1rem' }}>
+          선택된 경로에 복원된 영상이 저장되었습니다.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
+          <Button variant="dark" onClick={() => navigate('/')}>홈으로</Button>
+        </div>
+      </div>
+    </>
+    ) : isRecovering ? (
+        <>
+          <h1 className="upload-title">File Recovery</h1>
+          <p className="recovery-desc-left">잠시만 기다려 주세요… 영상을 복원하고 있어요</p>
 
-            <div className="recovery-file-box">
+          <div className="recovery-file-box">
               <div className="recovery-file-left">
                 <Badge label="진행중" />
                 <span className="file-name">{selectedFile?.name}</span>
               </div>
               <button className="close-btn" onClick={() => setIsRecovering(false)}>✕</button>
-            </div>
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <Potato />
-            </div>
-            <div className="recovery-desc-center">Recovering...</div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <Potato />
+              </div>
+          <div className="recovery-desc-center">Recovering...</div>
 
-            <div className="progress-bar-wrapper">
-              <div className="progress-bar-track">
+          <div className="progress-bar-wrapper">
+            <div className="progress-bar-track">
+              <div
+                className="progress-bar-fill"
+                style={{ width: `${progress}%`, transition: 'width 0.6s ease' }}
+              />
+            </div>
+            <div className="progress-bar-text">
+              {progress}%
+            </div>
+          </div>
+        </>
+  ) : !isRecovering && !recoveryDone ? (
+      <>
+      <h1 className="upload-title">File Upload</h1>
+      <p className="upload-subtitle">E01 파일을 업로드 해주세요</p>
+        <div
+          className="dropzone"
+          id="dadDrop"
+          onDrop={handleDrop}
+          onDragOver={(e) => e.preventDefault()}
+          onClick={handleClick}
+        >
+          <p className="dropzone-title">복구할 블랙박스 이미지(E01) 선택</p>
+          <p className="dropzone-desc">
+            E01 파일을 드래그 앤 드롭하거나 클릭하여 선택하세요<br />
+            분할된 E01 파일(.E01, E02, E03 ...)을 자동으로 인식합니다
+          </p>
+
+          <input
+            type="file"
+            id="dadFile"
+            accept=".E01"
+            ref={inputRef}
+            onChange={handleFileChange}
+            hidden
+          />
+          <Button variant="gray">
+            ⭱ <span>{selectedFile ? selectedFile.name : '업로드'}</span>
+          </Button>
+        </div>
+        </>
+
+        // 여기부터 Result Parser
+    ) : recoveryDone ? (
+      selectedAnalysisFile ? (
+        <>
+        <h1 className="upload-title">Result</h1>
+
+        <div className="recovery-file-box">
+          <span className="file-name">{selectedAnalysisFile}</span>
+          <div className="recovery-file-controls">
+            {selectedAnalysisFile.toLowerCase().endsWith('.avi') && (
+              <>
+                <Badge label="전방" onClick={() => console.log('전방 선택')} />
+                <Badge label="후방" onClick={() => console.log('후방 클릭')} />
+              </>
+            )}
+            <button className="close-btn" onClick={handleBack}>✕</button>
+          </div>
+        </div>
+
+        <div className="result-scroll-area">
+          {/* 뷰위치 */}
+          <div className="video-container">
+            <video
+              id="parser-video"
+              preload="metadata"
+              controls
+              style={{
+                width: '100%',
+                maxWidth: '1200px',
+                height: 'auto',
+                backgroundColor: 'white',
+              }}
+              src={
+              results.find(f => f.name === selectedAnalysisFile)?.origin_video
+                ? `file:///${results
+                    .find(f => f.name === selectedAnalysisFile)
+                    .origin_video.replace(/\\/g, '/')}`
+                : ''
+            }
+          ></video>
+
+            <div className="parser-controls">
+              <button id="replayBtn">
+                <img src={replayIcon} alt="Replay" />
+              </button>
+              <button
+                id="playPauseBtn"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <img
+                  id="playPauseIcon"
+                  src={pauseIcon}
+                  alt="Pause"
+                  style={{
+                    width: '30px',
+                    transition: 'filter 0.2s',
+                    filter: 'none', // 초기값: 원래색
+                  }}
+                />
+              </button>
+
+              <input type="range" id="progressBar" min="0" defaultValue="0" step="0.01" />
+              <span id="timeText">00:00 / 00:00</span>
+              <button id="fullscreenBtn">
+                <img src={fullscreenIcon} alt="Fullscreen" />
+              </button>
+            </div>
+          </div>
+
+          {/* Parser */}
+        <div className="parser-tabs">
+            <button
+              className={`parser-tab-button ${activeTab === 'basic' ? 'active' : ''}`}
+              onClick={() => setActiveTab('basic')}
+            >
+              <img src={basicIcon} alt="기본 정보" />
+              <span>기본 정보</span>
+            </button>
+            <button
+              className={`parser-tab-button ${activeTab === 'integrity' ? 'active' : ''}`}
+              onClick={() => setActiveTab('integrity')}
+            >
+              <img src={integrityIcon} alt="무결성 검사" />
+              <span>무결성 검사</span>
+            </button>
+            <button
+              className={`parser-tab-button ${activeTab === 'slack' ? 'active' : ''}`}
+              onClick={() => setActiveTab('slack')}
+            >
+              <img src={slackIcon} alt="슬랙 정보" />
+              <span>슬랙 정보</span>
+            </button>
+            <button
+              className={`parser-tab-button ${activeTab === 'structure' ? 'active' : ''}`}
+              onClick={() => setActiveTab('structure')}
+            >
+              <img src={structureIcon} alt="구조 정보" />
+              <span>구조 정보</span>
+            </button>
+          </div>
+
+          {/* 기본 정보 */}
+          <div className={`parser-tab-content ${activeTab === 'basic' ? 'active' : ''}`}>
+            <div className="parser-info-table">
+              <div className="parser-info-row">
+                <span className="parser-info-label">파일 포맷</span>
+                <span className="parser-info-value">{analysis.basic.format}</span>
+              </div>
+
+              {/* 파일시스템에서 시간 파싱하지 말고 복구 시간만 표시하기 */}
+              <div className="parser-info-row">
+                <span className="parser-info-label">복구 시간</span>
+                <span className="parser-info-value">{analysis.basic.timestamps.created}</span>
+              </div>
+
+              <div className="parser-info-row">
+                <span className="parser-info-label">파일 크기</span>
+                <span className="parser-info-value">
+                  {bytesToMB(analysis.basic.file_size)}
+                </span>
+              </div>
+              <div className="parser-info-row">
+                <span className="parser-info-label">비디오 코덱</span>
+                <span className="parser-info-value">
+                  {formatCodec(analysis.basic.video_metadata.codec)}
+                </span>
+              </div>
+              <div className="parser-info-row">
+                <span className="parser-info-label">해상도</span>
+                <span className="parser-info-value">
+                  {analysis.basic.video_metadata.width}×{analysis.basic.video_metadata.height}
+                </span>
+              </div>
+              <div className="parser-info-row">
+                <span className="parser-info-label">프레임 레이트</span>
+                <span className="parser-info-value">
+                  {Math.round(analysis.basic.video_metadata.frame_rate)} fps
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className={`parser-tab-content ${activeTab === 'integrity' ? 'active' : ''}`}>
+            <div className="parser-info-table">
+              <div className="parser-info-row">
+                <span className="parser-info-label">전체 상태</span>
+                <span className="parser-info-value">
+                  <img
+                    src={analysis.integrity.damaged ? integrityRed : integrityGreen}
+                    alt={analysis.integrity.damaged ? "손상" : "정상"}
+                    className="status-icon"
+                  />
+                  <span className={`status-text ${analysis.integrity.damaged ? 'red' : 'green'}`}>
+                    {analysis.integrity.damaged ? '손상됨' : '정상'}
+                  </span>
+                </span>
+              </div>
+              {analysis.integrity.damaged && analysis.integrity.reasons.length > 0 && (
+                <div className="parser-info-row">
+                  <span className="parser-info-label">손상 사유</span>
+                  <span className="parser-info-value">
+                    <ul className="reason-list">
+                      {analysis.integrity.reasons.map((reason, idx) => (
+                        <li key={idx}>{reason}</li>
+                      ))}
+                    </ul>
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>  
+          
+          <div className={`parser-tab-content ${activeTab === 'slack' ? 'active' : ''}`}>
+            <div className="parser-info-table">
+              <div className="parser-info-row">
+                <span className="parser-info-label">슬랙 비율</span>
+                <span className="parser-info-value">{slackPercent} %</span>
+              </div>
+              <div className="parser-info-row">
+                <span className="parser-info-label">유효 데이터 비율</span>
+                <span className="parser-info-value">
+                  {(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)} %
+                </span>
+              </div>
+              <div className="parser-info-row">
+                <span className="parser-info-label">데이터 분포</span>
+              </div>
+              <div className="data-bar-wrapper">
                 <div
-                  className="progress-bar-fill"
-                  style={{ width: `${progress}%`, transition: 'width 0.6s ease' }}
+                  className="data-bar-used"
+                  style={{
+                    width: `${(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)}%`
+                  }}
                 />
               </div>
-              <div className="progress-bar-text">
-                {progress}%
-              </div>
             </div>
-          </>
-        ) : !isRecovering && !recoveryDone ? (
-          <>
-            <h1 className="upload-title">File Upload</h1>
-            <p className="upload-subtitle">E01 파일을 업로드 해주세요</p>
-            <div
-              className="dropzone"
-              id="dadDrop"
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              onClick={handleClick}
-            >
-              <p className="dropzone-title">복구할 블랙박스 이미지(E01) 선택</p>
-              <p className="dropzone-desc">
-                E01 파일을 드래그 앤 드롭하거나 클릭하여 선택하세요<br />
-                분할된 E01 파일(.E01, E02, E03 ...)을 자동으로 인식합니다
-              </p>
+          </div>
 
-              <input
-                type="file"
-                id="dadFile"
-                accept=".E01"
-                ref={inputRef}
-                onChange={handleFileChange}
-                hidden
-              />
-              <Button variant="gray">
-                ⭱ <span>{selectedFile ? selectedFile.name : '업로드'}</span>
-              </Button>
-            </div>
-          </>
-
-          // 여기부터 Result Parser
-        ) : recoveryDone ? (
-          selectedAnalysisFile ? (
-            <>
-              <h1 className="upload-title">Result</h1>
-
-              <div className="recovery-file-box">
-                <span className="file-name">{selectedAnalysisFile}</span>
-                <div className="recovery-file-controls">
-                  {selectedAnalysisFile.toLowerCase().endsWith('.avi') && (
-                    <>
-                      <Badge label="전방" onClick={() => console.log('전방 선택')} />
-                      <Badge label="후방" onClick={() => console.log('후방 클릭')} />
-                    </>
-                  )}
-                  <button className="close-btn" onClick={handleBack}>✕</button>
-                </div>
+          <div className={`parser-tab-content ${activeTab === 'structure' ? 'active' : ''}`}>
+            <div className="parser-structure">
+                <h4>{analysis.structure.type.toUpperCase()} Structure</h4>
+                <pre className="structure-pre">
+                  {analysis.structure.structure.join('\n')}
+                </pre>
               </div>
+          </div>
+        </div>
+      </>
+    ) : (
+      <>
+        {/* 분석 후 바로 나오는 화면 */}
+        <h1 className="upload-title">Result</h1>
+        <div className="recovery-file-box">
+          <span className="result-recovery-text">복원된 파일 목록</span>
+        </div>
+        <div className="result-wrapper">
+          {/* 요약: 개수 + 전체 용량 */}
+          <p className="result-summary">
+            총 {results.length}개의 파일, 용량{' '}
+            {bytesToMB(
+              results.reduce((sum, f) => sum + f.size, 0)
+            )}
+          </p>
 
-              <div className="result-scroll-area">
-                {/* 뷰위치 */}
-                <div className="video-container">
-                  <video
-                    id="parser-video"
-                    preload="metadata"
-                    controls
-                    style={{
-                      width: '100%',
-                      maxWidth: '1200px',
-                      height: 'auto',
-                      backgroundColor: 'white',
-                    }}
-                    src={
-                      results.find(f => f.name === selectedAnalysisFile)?.origin_video
-                        ? `file:///${results
-                          .find(f => f.name === selectedAnalysisFile)
-                          .origin_video.replace(/\\/g, '/')}`
-                        : ''
-                    }
-                  ></video>
-
-                  <div className="parser-controls">
-                    <button id="replayBtn">
-                      <img src={replayIcon} alt="Replay" />
-                    </button>
-                    <button
-                      id="playPauseBtn"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-                    >
-                      <img
-                        id="playPauseIcon"
-                        src={pauseIcon}
-                        alt="Pause"
-                        style={{
-                          width: '30px',
-                          transition: 'filter 0.2s',
-                          filter: 'none', // 초기값: 원래색
-                        }}
-                      />
-                    </button>
-
-                    <input type="range" id="progressBar" min="0" defaultValue="0" step="0.01" />
-                    <span id="timeText">00:00 / 00:00</span>
-                    <button id="fullscreenBtn">
-                      <img src={fullscreenIcon} alt="Fullscreen" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Parser */}
-                <div className="parser-tabs">
-                  <button
-                    className={`parser-tab-button ${activeTab === 'basic' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('basic')}
-                  >
-                    <img src={basicIcon} alt="기본 정보" />
-                    <span>기본 정보</span>
-                  </button>
-                  <button
-                    className={`parser-tab-button ${activeTab === 'integrity' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('integrity')}
-                  >
-                    <img src={integrityIcon} alt="무결성 검사" />
-                    <span>무결성 검사</span>
-                  </button>
-                  <button
-                    className={`parser-tab-button ${activeTab === 'slack' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('slack')}
-                  >
-                    <img src={slackIcon} alt="슬랙 정보" />
-                    <span>슬랙 정보</span>
-                  </button>
-                  <button
-                    className={`parser-tab-button ${activeTab === 'structure' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('structure')}
-                  >
-                    <img src={structureIcon} alt="구조 정보" />
-                    <span>구조 정보</span>
-                  </button>
-                </div>
-
-                {/* 기본 정보 */}
-                <div className={`parser-tab-content ${activeTab === 'basic' ? 'active' : ''}`}>
-                  <div className="parser-info-table">
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">파일 포맷</span>
-                      <span className="parser-info-value">{analysis.basic.format}</span>
-                    </div>
-
-                    {/* 파일시스템에서 시간 파싱하지 말고 복구 시간만 표시하기 */}
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">복구 시간</span>
-                      <span className="parser-info-value">{analysis.basic.timestamps.created}</span>
-                    </div>
-
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">파일 크기</span>
-                      <span className="parser-info-value">
-                        {bytesToMB(analysis.basic.file_size)}
-                      </span>
-                    </div>
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">비디오 코덱</span>
-                      <span className="parser-info-value">
-                        {formatCodec(analysis.basic.video_metadata.codec)}
-                      </span>
-                    </div>
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">해상도</span>
-                      <span className="parser-info-value">
-                        {analysis.basic.video_metadata.width}×{analysis.basic.video_metadata.height}
-                      </span>
-                    </div>
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">프레임 레이트</span>
-                      <span className="parser-info-value">
-                        {Math.round(analysis.basic.video_metadata.frame_rate)} fps
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`parser-tab-content ${activeTab === 'integrity' ? 'active' : ''}`}>
-                  <div className="parser-info-table">
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">전체 상태</span>
-                      <span className="parser-info-value">
-                        <img
-                          src={analysis.integrity.damaged ? integrityRed : integrityGreen}
-                          alt={analysis.integrity.damaged ? "손상" : "정상"}
-                          className="status-icon"
-                        />
-                        <span className={`status-text ${analysis.integrity.damaged ? 'red' : 'green'}`}>
-                          {analysis.integrity.damaged ? '손상됨' : '정상'}
-                        </span>
-                      </span>
-                    </div>
-                    {analysis.integrity.damaged && analysis.integrity.reasons.length > 0 && (
-                      <div className="parser-info-row">
-                        <span className="parser-info-label">손상 사유</span>
-                        <span className="parser-info-value">
-                          <ul className="reason-list">
-                            {analysis.integrity.reasons.map((reason, idx) => (
-                              <li key={idx}>{reason}</li>
-                            ))}
-                          </ul>
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className={`parser-tab-content ${activeTab === 'slack' ? 'active' : ''}`}>
-                  <div className="parser-info-table">
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">슬랙 비율</span>
-                      <span className="parser-info-value">{slackPercent} %</span>
-                    </div>
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">유효 데이터 비율</span>
-                      <span className="parser-info-value">
-                        {(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)} %
-                      </span>
-                    </div>
-                    <div className="parser-info-row">
-                      <span className="parser-info-label">데이터 분포</span>
-                    </div>
-                    <div className="data-bar-wrapper">
-                      <div
-                        className="data-bar-used"
-                        style={{
-                          width: `${(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`parser-tab-content ${activeTab === 'structure' ? 'active' : ''}`}>
-                  <div className="parser-structure">
-                    <h4>{analysis.structure.type.toUpperCase()} Structure</h4>
-                    <pre className="structure-pre">
-                      {analysis.structure.structure.join('\n')}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* 분석 후 바로 나오는 화면 */}
-              <h1 className="upload-title">Result</h1>
-              <div className="recovery-file-box">
-                <span className="result-recovery-text">복원된 파일 목록</span>
-              </div>
-              <div className="result-wrapper">
-                {/* 요약: 개수 + 전체 용량 */}
-                <p className="result-summary">
-                  총 {results.length}개의 파일, 용량{' '}
-                  {bytesToMB(
-                    results.reduce((sum, f) => sum + f.size, 0)
-                  )}
-                </p>
-
-                <div className="result-scroll-area" style={{ position: 'relative' }}>
-                  {Object.entries(groupedResults).map(([category, files]) => (
-                    <div className="result-group" key={category}>
-                      {/* 그룹 헤더 */}
-                      <div
-                        className={`result-group-header ${openGroups[category] ? 'open' : ''}`}
-                        onClick={() => toggleGroup(category)}
-                      >
-                        <span className="result-group-toggle" />
-                        <img
-                          className="result-group-icon"
-                          src={getCategoryIcon(category)}
-                          alt={`${category} icon`}
-                        />
-                        {category} ({files.length})
-                      </div>
-
-                      {/* 그룹 열려있을 때만 리스트 */}
-                      {openGroups[category] && (
-                        <div className="result-file-list">
-                          {files.map((file) => {
-                            const mb = bytesToMB(file.size);
-                            const rawRate = file.slack_info.slack_rate;
-                            const slackRatePercent =
-                              rawRate <= 1
-                                ? (rawRate * 100).toFixed(0)
-                                : rawRate.toFixed(0);
-
-                            return (
-                              <div className="result-file-item" key={file.path}>
-                                <div className="result-file-info">
-                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <button
-                                      className="text-button"
-                                      onClick={() => handleFileClick(file.name)}
-                                    >
-                                      {file.name}
-                                    </button>
-                                    {slackRatePercent > 0 && (
-                                      <Badge
-                                        label="슬랙"
-                                        onClick={() => {
-                                          const slackPath = file.slack_info?.output_path;
-                                          if (!slackPath) {
-                                            return;
-                                          }
-
-                                          const formatted = `file:///${slackPath.replace(/\\/g, '/')}`;
-                                          console.log('🎯 슬랙 영상 경로:', formatted);
-
-                                          setSlackVideoSrc(formatted);  // ✅ 슬랙 영상 경로 저장
-                                          setShowSlackPopup(true);      // ✅ 팝업 열기
-                                        }}
-                                        style={{ cursor: 'pointer' }}
-                                      />
-                                    )}
-                                  </div>
-                                  <br />
-                                  {mb} MB ・ 슬랙비율 {slackRatePercent} %
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
+          <div className="result-scroll-area" style={{ position: 'relative' }}>
+            {Object.entries(groupedResults).map(([category, files]) => (
+              <div className="result-group" key={category}>
+                {/* 그룹 헤더 */}
                 <div
-                  style={{
-                    position: 'absolute',
-                    bottom: '1.5rem',
-                    right: '4rem',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                  }}
+                  className={`result-group-header ${openGroups[category] ? 'open' : ''}`}
+                  onClick={() => toggleGroup(category)}
                 >
-                  <Button variant="dark" onClick={handleDownload}>
-                    다운로드
-                  </Button>
+                  <span className="result-group-toggle"/>
+                  <img
+                    className="result-group-icon"
+                    src={getCategoryIcon(category)}
+                    alt={`${category} icon`}
+                  />
+                  {category} ({files.length})
                 </div>
-              </div>
-            </>
-          )
-        ) : null
-        }
-      </Box>
-      {showAlert && (
-        <Alert
-          icon={alertIcon}
-          title="파일 형식 오류"
-          description={
-            <>
-              선택한 파일은 E01 이미지 형식이 아닙니다<br />
-              해당 도구는 .E01 형식만 지원됩니다<br />
-              올바른 파일을 다시 선택해 주세요
-            </>
-          }
-        >
-          <Button variant="dark" onClick={() => setShowAlert(false)}>다시 선택</Button>
-        </Alert>
-      )}
 
-      {showSlackPopup && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999,
-          }}
-        >
-          <div style={{ position: 'absolute', top: '20px', right: '30px' }}>
-            <Button variant="gray" onClick={() => setShowSlackPopup(false)}>
-              닫기
+                {/* 그룹 열려있을 때만 리스트 */}
+                {openGroups[category] && (
+                  <div className="result-file-list">
+                    {files.map((file) => {
+                      const mb = bytesToMB(file.size);
+                      const rawRate = file.slack_info.slack_rate;
+                      const slackRatePercent =
+                        rawRate <= 1
+                          ? (rawRate * 100).toFixed(0)
+                          : rawRate.toFixed(0);
+                      
+                      return (
+                        <div className="result-file-item" key={file.path}>
+                          <div className="result-file-info">
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <button
+                                  className="text-button"
+                                  onClick={() => handleFileClick(file.name)}
+                                >
+                                  {file.name}
+                                </button>
+                                {slackRatePercent > 0 && (
+                                  <Badge
+                                    label="슬랙"
+                                    onClick={() => {
+                                      const slackPath = file.slack_info?.output_path;
+                                      if (!slackPath) {
+                                        return;
+                                      }
+
+                                      const formatted = `file:///${slackPath.replace(/\\/g, '/')}`;
+                                      console.log('🎯 슬랙 영상 경로:', formatted);
+
+                                      setSlackVideoSrc(formatted);  // ✅ 슬랙 영상 경로 저장
+                                      setShowSlackPopup(true);      // ✅ 팝업 열기
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                )}
+                                </div>
+                            <br />
+                            {mb} MB ・ 슬랙비율 {slackRatePercent} %
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+  
+          <div
+            style={{
+              position: 'absolute',  
+              bottom: '1.5rem',      
+              right: '4rem',       
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <Button variant="dark" onClick={handleDownload}>
+              다운로드
             </Button>
           </div>
-          <video
-            preload="metadata"
-            controls
-            style={{
-              width: '90vw',
-              height: '80vh',
-              backgroundColor: 'black',
-              borderRadius: '12px',
-            }}
-            src={slackVideoSrc}  // ✅ 핵심 수정
-          />
         </div>
-      )}
+      </>
+    )
+  ) : null
+}
+  </Box>
 
-      {showDownloadPopup && (
-        <Alert
-          icon={downloadIcon}
-          title="다운로드 옵션"
-          description={
+    {showAlert && (
+      <Alert
+        icon={alertIcon}
+        title="파일 형식 오류"
+        description={
+          <>
+            선택한 파일은 E01 이미지 형식이 아닙니다<br />
+            해당 도구는 .E01 형식만 지원됩니다<br />
+            올바른 파일을 다시 선택해 주세요
+          </>
+        }
+      >
+        <Button variant="dark" onClick={() => setShowAlert(false)}>다시 선택</Button>
+      </Alert>
+    )}
+
+    {showSlackPopup && (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+        }}
+      >
+        <div style={{ position: 'absolute', top: '20px', right: '30px' }}>
+          <Button variant="gray" onClick={() => setShowSlackPopup(false)}>
+            닫기
+          </Button>
+        </div>
+        <video
+          preload="metadata"
+          controls
+          style={{
+            width: '90vw',
+            height: '80vh',
+            backgroundColor: 'black',
+            borderRadius: '12px',
+          }}
+          src={slackVideoSrc}  // ✅ 핵심 수정
+        />
+      </div>
+    )}
+
+    
+    {showDownloadPopup && (
+      <Alert
+        icon={downloadIcon}
+        title="다운로드 옵션"
+        description={
             <div className="download-popup-wide">
               <p>
                 영상과 함께 각 프레임 이미지를 ZIP으로 다운받으시겠습니까?
@@ -929,42 +901,41 @@ const Recovery = () => {
                 </label>
                 <label>
                   <input
-                    type="radio"
-                    name="saveFrames"
-                    checked={saveFrames === false}
-                    onChange={() => setSaveFrames(false)}
-                  /> 아니요
-                </label>
-              </div>
-              <div
-                className="path-box"
-                style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}
-              >
-                <input
-                  type="text"
-                  value={selectedPath}
-                  readOnly
-                  className="custom-path-input"
-                  style={{ flex: 1 }}
-                  placeholder="경로를 지정해주세요"
-                />
-                <Button variant="gray" onClick={handlePathSelect}>
-                  경로 지정
-                </Button>
-              </div>
+                  type="radio"
+                  name="saveFrames"
+                  checked={saveFrames === false}
+                  onChange={() => setSaveFrames(false)}
+                /> 아니요
+              </label>  
             </div>
-          }
-        >
           <div
-            className="alert-buttons"
-            style={{ marginTop: '1rem', display: 'flex', gap: '10px' }}
+            className="path-box"
+            style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}
           >
-            <Button variant="gray" onClick={handleDownloadCancel}>이전</Button>
-            <Button variant="dark" onClick={handleDownloadConfirm}>완료</Button>
+            <input
+              type="text"
+              value={selectedPath}
+              readOnly
+              className="custom-path-input"
+              style={{ flex: 1 }}
+            />
+            <Button variant="gray" onClick={handlePathSelect}>
+              경로 지정
+            </Button> 
           </div>
-        </Alert>
-      )}
-    </>
+        </div>
+        }
+      >
+        <div 
+          className="alert-buttons"
+          style={{ marginTop: '1rem', display: 'flex', gap: '10px' }}
+        >
+          <Button variant="gray" onClick={handleDownloadCancel}>이전</Button>
+          <Button variant="dark" onClick={handleDownloadConfirm}>완료</Button>
+        </div>
+      </Alert>
+    )}
+  </>
   );
 }
 
