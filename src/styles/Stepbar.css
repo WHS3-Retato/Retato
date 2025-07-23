@@ -48,7 +48,7 @@
     border-radius: 50%;
     background-color: #d7d7d7;
     z-index: 2;
-    margin-top: 1.5rem;
+    margin-top: 1.2rem;
 }
 
 .rcvpage .step.active .circle {
@@ -73,12 +73,10 @@
     font-weight: 900;
 }
 
-.rcvpage .step.active .label {
-    color: #1f2937;
-    font-size: 0.9rem;
-    font-weight: 900;
-    margin-top: 0.3rem;
+.rcvpage .step.active .label, .rcvpage .step.completed .label{
+    margin-top: 0.3rem;   
 }
+
 
 .rcvpage .step.completed .circle {
     width: 28px;

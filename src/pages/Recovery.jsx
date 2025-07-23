@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import Stepbar from '../components/Stepbar.jsx';
 import Box from '../components/Box.jsx';
@@ -16,7 +16,7 @@ import parkingIcon from '../images/parking.svg';
 import eventIcon from '../images/event.svg';
 import deletedIcon from '../images/deleted.svg';
 import downloadIcon from '../images/download.svg';
-import basicIcon from '../images/information.svg';
+import basicIcon from '../images/information_t.svg';
 import integrityIcon from '../images/integrity.svg';
 import slackIcon from '../images/slack.svg';
 import structureIcon from '../images/struc.svg';
@@ -38,6 +38,7 @@ const Recovery = () => {
   const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState(null);
+  const [saveFrames, setSaveFrames] = useState(false);
   const [selectedPath, setSelectedPath] = useState("C:\\Users\\Downloads");
 
   const [isRecovering, setIsRecovering] = useState(false);
@@ -45,14 +46,44 @@ const Recovery = () => {
   const [currentCount, setCurrentCount] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
 
+  const [results, setResults] = useState([]);
+  const [openGroups, setOpenGroups] = useState({});
+  function groupByCategory(list) {
+    return list.reduce((acc, file) => {
+      const cat = file.path.split(/[/\\]/)[1] || 'unknown'
+      if (!acc[cat]) acc[cat] = []
+      acc[cat].push(file)
+      return acc
+    }, {})
+  }
+  const groupedResults = useMemo(() => groupByCategory(results), [results])
+
   const [selectedAnalysisFile, setSelectedAnalysisFile] = useState(null); 
   const [activeTab, setActiveTab] = useState('basic');
   const [showComplete, setShowComplete] = useState(false);
   const [showDownloadAlert, setShowDownloadAlert] = useState(false);
   
   const location = useLocation();
+  const initialFile = location.state?.e01File || null;
+  const autoStart   = location.state?.autoStart || false;
 
-  const [autoStart, setAutoStart] = useState(location.state?.autoStart || false);
+  // 바이트 → MB 변환
+  const bytesToMB = (bytes) => (bytes / 1024 / 1024).toFixed(1) + ' MB';
+
+  // ex: "h264" → "H.264"
+  const formatCodec = (codec) =>
+    codec
+      .toUpperCase()
+      .replace(/^([HE]\d{3,4})$/, (m) => m[0] + '.' + m.slice(1));
+
+  const analysis = useMemo(
+    () => results.find(f => f.name === selectedAnalysisFile)?.analysis,
+    [results, selectedAnalysisFile]
+  );
+
+  const slack_info = analysis?.slack_info ?? { slack_rate: 0 };
+  const slackPercent = (slack_info.slack_rate * 100).toFixed(1);
+  const validPercent = (100 - slack_info.slack_rate * 100).toFixed(1);
 
   useEffect(() => {
     if (progress >= 100) {
@@ -73,6 +104,28 @@ const Recovery = () => {
     deleted: deletedIcon,
   };
 
+  // special override: 'shock' 인 경우 event 아이콘
+  const specialCategoryMap = {
+    shock: 'event',
+    // 필요시 더 추가…
+  };
+
+  // 아이콘 결정 헬퍼
+  const getCategoryIcon = (category) => {
+    const cat = category.toLowerCase();
+    // special first
+    for (const [match, iconKey] of Object.entries(specialCategoryMap)) {
+      if (cat.includes(match)) {
+        return categoryIcons[iconKey];
+      }
+    }
+    // prefix 기본 매핑
+    const prefix = Object.keys(categoryIcons).find((k) =>
+      cat.startsWith(k)
+    );
+    return prefix ? categoryIcons[prefix] : slackIcon;
+  };
+
   // 메인에서 progress/done 이벤트 받아오기
   useEffect(() => {
     console.log('📡 onProgress useEffect mounted');
@@ -90,6 +143,22 @@ const Recovery = () => {
   return () => { offProg(); offDone(); };
 }, []);
 
+  useEffect(() => {
+    console.log('📡 onResults listener registered')
+    const off = window.api.onResults(data => {
+      console.log('📥 [Debug] onResults data:', data)
+      if (data.error) setResultError(data.error);
+      else setResults(data);
+    });
+    return off;
+  }, []);
+
+  useEffect(() => {
+    const init = {}
+    Object.keys(groupedResults).forEach(cat => { init[cat] = true })
+    setOpenGroups(init)
+  }, [groupedResults])
+
   // isRecovering가 true가 되면 startRecovery 호출
   useEffect(() => {
     if (isRecovering && selectedFile) {
@@ -97,21 +166,27 @@ const Recovery = () => {
     }
   }, [isRecovering, selectedFile]);
 
-  const handleFile = file => {
-  if (!file.name.toLowerCase().endsWith('.e01')) {
-    setShowAlert(true);
-    return;
-  }
-  setSelectedFile(file);
-  setShowAlert(false);
-  setIsRecovering(true);
-  setRecoveryDone(false);
-  setProgress(0);
-  setTotalFiles(0);
-  // 직접 호출해 버려도 OK
-  window.api.startRecovery(file.path);
-};
+  useEffect(() => {
+    if (autoStart && initialFile) {
+      handleFile(initialFile);
+    }
+  }, [autoStart, initialFile]);
 
+  const handleFile = file => {
+    if (!file.name.toLowerCase().endsWith('.e01')) {
+      setShowAlert(true);
+      return;
+    }
+    setSelectedFile(file);
+    setShowAlert(false);
+    setIsRecovering(true);
+    setRecoveryDone(false);
+    setProgress(0);
+    setTotalFiles(0);
+    window.api
+      .startRecovery(file.path)
+      .catch(err => console.error('🤖 startRecovery error:', err));
+  };
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -140,22 +215,10 @@ const Recovery = () => {
     setCurrentCount(0);
     setProgress(0);
     setTotalFiles(300);
-    setShowComplete(true); // 하드코딩: 백엔드에서 받을 예정
   };
 
-  const toggleGroup = (id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const isOpen = el.style.display === 'block';
-    el.style.display = isOpen ? 'none' : 'block';
-
-    const headers = document.getElementsByClassName('result-group-header');
-    for (let h of headers) {
-      if (h.textContent.includes(id.charAt(0).toUpperCase() + id.slice(1))) {
-        h.classList.toggle('open', !isOpen);
-      }
-    }
-  };
+  const toggleGroup = (cat) =>
+    setOpenGroups(prev => ({ ...prev, [cat]: !prev[cat] }))
 
   const confirmDownload = () => {
     console.log("최종 저장 경로:", selectedPath);
@@ -183,11 +246,22 @@ const Recovery = () => {
   };
 
   // 다운로드 백엔드
-  const handleDownloadConfirm = () => {
-  // 다운로드 로직 (백엔드 연결 예정)
-  setShowComplete(true);
-  setShowComplete(true); 
-  setShowDownloadPopup(false); // 팝업 닫기
+  const handleDownloadConfirm =  async() => {
+    const choice = saveFrames ? 'both' : 'video';
+
+    try {
+      await window.api.invoke('run-download', {
+        analysisJsonPath: tmpJsonPath,
+        choice,
+        downloadPath: selectedPath
+      });
+
+      setShowComplete(true)
+    } catch (err) {
+      console.error('다운로드 실패:', err);
+    } finally {
+      setShowDownloadPopup(false);
+    }
   };
 
   const handleDownloadCancel = () => {
@@ -203,8 +277,16 @@ const Recovery = () => {
 
   const handlePathSelect = async () => {
     const result = await window.api.selectFolder();  // api로 접근
+    let dir;
+
     if (result && !result.canceled && result.filePaths.length > 0) {
-      setSelectedPath(result.filePaths[0]);  // 경로 반영
+      dir = result.filePaths[0];
+    } else {
+      dir = await window.api.invoke('select-download-dir');
+    }
+
+    if (dir) {
+      setSelectedPath(dir);
     }
   };
 
@@ -364,11 +446,11 @@ const Recovery = () => {
             <div className="progress-bar-track">
               <div
                 className="progress-bar-fill"
-                style={{
-                  width: `${progress}%`,
-                  transition: 'width 0.6s ease',
-                }}
+                style={{ width: `${progress}%`, transition: 'width 0.6s ease' }}
               />
+            </div>
+            <div className="progress-bar-text">
+              {progress}%
             </div>
           </div>
         </>
@@ -412,12 +494,15 @@ const Recovery = () => {
         <div className="recovery-file-box">
           <span className="file-name">{selectedAnalysisFile}</span>
           <div className="recovery-file-controls">
-            <Badge label="전방" onClick={() => console.log('전방 선택')} />
-            <Badge label="후방" onClick={() => console.log('후방 클릭')} />
+            {selectedAnalysisFile.toLowerCase().endsWith('.avi') && (
+              <>
+                <Badge label="전방" onClick={() => console.log('전방 선택')} />
+                <Badge label="후방" onClick={() => console.log('후방 클릭')} />
+              </>
+            )}
             <button className="close-btn" onClick={handleBack}>✕</button>
           </div>
         </div>
-
 
         <div className="result-scroll-area">
           {/* View */}
@@ -480,99 +565,89 @@ const Recovery = () => {
             <div className="parser-info-table">
               <div className="parser-info-row">
                 <span className="parser-info-label">파일 포맷:</span>
-                <span className="parser-info-value">MP4</span>
+                <span className="parser-info-value">{analysis.basic.format}</span>
               </div>
-              <div className="parser-info-row">
-                <span className="parser-info-label">생성 시간:</span>
-                <span className="parser-info-value">2024-12-30 09:30:45</span>
-              </div>
-              <div className="parser-info-row">
-                <span className="parser-info-label">수정 시간:</span>
-                <span className="parser-info-value">2024-12-30 09:30:45</span>
-              </div>
-              <div className="parser-info-row">
-                <span className="parser-info-label">마지막 접근 시간:</span>
-                <span className="parser-info-value">2024-12-30 09:30:45</span>
-              </div>
+              {Object.entries(analysis.basic.timestamps).map(([key, ts]) => {
+                const labelMap = {
+                  created: '생성 시간',
+                  modified: '수정 시간',
+                  accessed: '마지막 접근 시간',
+                };
+                return (
+                  <div className="parser-info-row" key={key}>
+                    <span className="parser-info-label">{labelMap[key]}:</span>
+                    <span className="parser-info-value">{ts}</span>
+                  </div>
+                );
+              })}
               <div className="parser-info-row">
                 <span className="parser-info-label">파일 크기:</span>
-                <span className="parser-info-value">2.1 GB</span>
-              </div>
-              <div className="parser-info-row">
-                <span className="parser-info-label">재생 시간:</span>
-                <span className="parser-info-value">00:30</span>
+                <span className="parser-info-value">
+                  {bytesToMB(analysis.basic.file_size)}
+                </span>
               </div>
               <div className="parser-info-row">
                 <span className="parser-info-label">비디오 코덱:</span>
-                <span className="parser-info-value">H.264</span>
+                <span className="parser-info-value">
+                  {formatCodec(analysis.basic.video_metadata.codec)}
+                </span>
               </div>
               <div className="parser-info-row">
                 <span className="parser-info-label">해상도:</span>
-                <span className="parser-info-value">1920×1080</span>
+                <span className="parser-info-value">
+                  {analysis.basic.video_metadata.width}×{analysis.basic.video_metadata.height}
+                </span>
               </div>
               <div className="parser-info-row">
                 <span className="parser-info-label">프레임 레이트:</span>
-                <span className="parser-info-value">30 fps</span>
+                <span className="parser-info-value">
+                  {Math.round(analysis.basic.video_metadata.frame_rate)} fps
+                </span>
               </div>
             </div>
           </div>
 
           <div className={`parser-tab-content ${activeTab === 'integrity' ? 'active' : ''}`}>
-            <div className={`parser-tab-content ${activeTab === 'integrity' ? 'active' : ''}`}>
             <div className="parser-info-table">
               <div className="parser-info-row">
                 <span className="parser-info-label">전체 상태:</span>
                 <span className="parser-info-value">
-                  <img src={integrityYellow} alt="부분 손상" className="status-icon" />
-                  <span className="status-text yellow">부분 손상</span>
+                  <img
+                    src={analysis.integrity.damaged ? integrityRed : integrityGreen}
+                    alt={analysis.integrity.damaged ? "손상" : "정상"}
+                    className="status-icon"
+                  />
+                  <span className={`status-text ${analysis.integrity.damaged ? 'red' : 'green'}`}>
+                    {analysis.integrity.damaged ? '손상됨' : '정상'}
+                  </span>
                 </span>
               </div>
+              {analysis.integrity.damaged && analysis.integrity.reasons.length > 0 && (
                 <div className="parser-info-row">
-                  <span className="parser-info-label">moov box:</span>
+                  <span className="parser-info-label">손상 사유:</span>
                   <span className="parser-info-value">
-                    <img src={integrityRed} alt="심각한 손상" className="status-icon" />
-                    <span className="status-text red">심각한 손상</span>
+                    <ul className="reason-list">
+                      {analysis.integrity.reasons.map((reason, idx) => (
+                        <li key={idx}>{reason}</li>
+                      ))}
+                    </ul>
                   </span>
                 </div>
-                <div className="parser-info-row">
-                  <span className="parser-info-label">mdat box:</span>
-                  <span className="parser-info-value">
-                    <img src={integrityGreen} alt="정상" className="status-icon" />
-                    <span className="status-text green">정상</span>
-                  </span>
-                </div>
-                <div className="parser-info-row">
-                  <span className="parser-info-label">헤더 손상:</span>
-                  <span className="parser-info-value">
-                    <img src={integrityGreen} alt="정상" className="status-icon" />
-                    <span className="status-text green">정상</span>
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
-          </div>
-
+          </div>  
+          
           <div className={`parser-tab-content ${activeTab === 'slack' ? 'active' : ''}`}>
             <div className="parser-info-table">
               <div className="parser-info-row">
-                <span className="parser-info-label">전체 크기:</span>
-                <span className="parser-info-value">47,448,064 bytes</span>
-              </div>
-              <div className="parser-info-row">
-                <span className="parser-info-label">사용된 크기:</span>
-                <span className="parser-info-value">47,448,064 bytes</span>
-              </div>
-              <div className="parser-info-row">
-                <span className="parser-info-label">슬랙 크기:</span>
-                <span className="parser-info-value">2,248,064 bytes</span>
-              </div>
-              <div className="parser-info-row">
                 <span className="parser-info-label">슬랙 비율:</span>
-                <span className="parser-info-value">4.7%</span>
+                <span className="parser-info-value">{slackPercent} %</span>
               </div>
               <div className="parser-info-row">
                 <span className="parser-info-label">유효 데이터 비율:</span>
-                <span className="parser-info-value">95.3%</span>
+                <span className="parser-info-value">
+                  {(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)} %
+                </span>
               </div>
               <div className="parser-info-row">
                 <span className="parser-info-label">데이터 분포</span>
@@ -580,7 +655,9 @@ const Recovery = () => {
               <div className="data-bar-wrapper">
                 <div
                   className="data-bar-used"
-                  style={{ width: '95.3%' }} // 유효 데이터 비율만큼 채움
+                  style={{
+                    width: `${(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)}%`
+                  }}
                 />
               </div>
             </div>
@@ -588,23 +665,10 @@ const Recovery = () => {
 
           <div className={`parser-tab-content ${activeTab === 'structure' ? 'active' : ''}`}>
             <div className="parser-structure">
-                <h4>AVI Structure</h4>
-                  file size : 0x6AAAFEA<br />
-                  file data size : 0x6AAAEF2<br />
-                  <br />
-                  [LIST-hdrl] offset: 0xC / size: 0x21C<br />
-                  JUNK start offset : 0x230<br />
-                  JUNK size : 0xF4<br />
-                  <br />
-                  [LIST-movi] offset: 0x32C / size: 0x6A9BECE<br />
-                  idx1 start offset : 0x6A9C202<br />
-                  idx1 size : 0xEBA0<br />
-                  <br />
-                  JUNK start offset : 0x6AAADA<br />
-                  JUNK size : 0x140<br />
-                  <br />
-                  JUNK start offset : 0x6AAAEF2<br />
-                  JUNK size : 0x4211106
+                <h4>{analysis.structure.type.toUpperCase()} Structure</h4>
+                <pre className="structure-pre">
+                  {analysis.structure.structure.join('\n')}
+                </pre>
               </div>
           </div>
         </div>
@@ -613,52 +677,84 @@ const Recovery = () => {
       <>
         {/* 분석 후 바로 나오는 화면 */}
         <h1 className="upload-title">Result</h1>
-        <div class="result-wrapper">
-        <p className="result-summary">총 5개의 파일, 용량: 5.4GB</p>
+        <div className="recovery-file-box">
+          <span className="result-recovery-text">복원된 파일 목록</span>
+        </div>
+        <div className="result-wrapper">
+          {/* 요약: 개수 + 전체 용량 */}
+          <p className="result-summary">
+            총 {results.length}개의 파일, 용량:{' '}
+            {bytesToMB(
+              results.reduce((sum, f) => sum + f.size, 0)
+            )}
+          </p>
 
-        <div className="result-scroll-area">
-          {['driving', 'parking', 'event', 'slack', 'deleted'].map((category) => (
-            <div className="result-group" key={category}>
-              <div
-                className="result-group-header open"
-                onClick={() => toggleGroup(category)}
-              >
-                <span className="result-group-toggle"></span>
-                <img
-                  className="result-group-icon"
-                  src={categoryIcons[category]}
-                  alt={`${category} icon`}
-                />
-                {category.charAt(0).toUpperCase() + category.slice(1)} (2)
-              </div>
-
-              <div
-                className="result-file-list"
-                id={category}
-                style={{ display: 'block' }}
-              >
-                <div className="result-file-item">
-                  <input className="result-checkbox" type="checkbox" />
-                  <div className="result-file-info">
-                    <button
-                      className="text-button"
-                      onClick={() => handleFileClick('2023-08-14_17-12-11_Front.mp4')}
-                    >
-                      2023-08-14_17-12-11_Front.mp4
-                    </button>
-                    <br />
-                    17:12:11 ~ 17:13:08<br />
-                    45.2MB ・ 슬랙비율: 12%
-                  </div>
+          <div className="result-scroll-area" style={{ position: 'relative' }}>
+            {Object.entries(groupedResults).map(([category, files]) => (
+              <div className="result-group" key={category}>
+                {/* 그룹 헤더 */}
+                <div
+                  className={`result-group-header ${openGroups[category] ? 'open' : ''}`}
+                  onClick={() => toggleGroup(category)}
+                >
+                  <span className="result-group-toggle"/>
+                  <img
+                    className="result-group-icon"
+                    src={getCategoryIcon(category)}
+                    alt={`${category} icon`}
+                  />
+                  {category} ({files.length})
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginRight:'2rem' }}>
-          <Button variant="dark" onClick={handleDownload}>다운로드</Button>
-        </div>
+                {/* 그룹 열려있을 때만 리스트 */}
+                {openGroups[category] && (
+                  <div className="result-file-list">
+                    {files.map((file) => {
+                      const mb = bytesToMB(file.size);
+                      const rawRate = file.slack_info.slack_rate;
+                      const slackRatePercent =
+                        rawRate <= 1
+                          ? (rawRate * 100).toFixed(0)
+                          : rawRate.toFixed(0);
+                      
+                      return (
+                        <div className="result-file-item" key={file.path}>
+                          <input
+                            className="result-checkbox"
+                            type="checkbox"
+                          />
+                          <div className="result-file-info">
+                            <button
+                              className="text-button"
+                              onClick={() => handleFileClick(file.name)}
+                            >
+                              {file.name}
+                            </button>
+                            <br />
+                            {mb} MB ・ 슬랙비율: {slackRatePercent} %
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+  
+          <div
+            style={{
+              position: 'absolute',  
+              bottom: '1.5rem',      
+              right: '4rem',       
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <Button variant="dark" onClick={handleDownload}>
+              다운로드
+            </Button>
+          </div>
         </div>
       </>
     )
@@ -687,28 +783,50 @@ const Recovery = () => {
         icon={downloadIcon}
         title="다운로드 옵션"
         description={
-          <>
             <div className="download-popup-wide">
-              복원 결과물을 이미지(jpeg) 형식으로도 저장하시겠습니까?<br />  <br />
-              <div className="download-options">
-                <label><input type="radio" name="path" value="desktop" />Y</label>
-                <label><input type="radio" name="path" value="downloads" /> N </label><br />   <br />   
-              </div>
-              <div className="path-box" style={{ display: 'flex', marginTop: '1rem', gap: '1rem' }}>
-                <input
-                  type="text"
-                  value={selectedPath}
-                  readOnly
-                  className="custom-path-input"
-                  style={{ flex: 1 }}
-                />
-                <Button variant="gray" onClick={handlePathSelect}>경로 지정</Button><br />   
-              </div>
+              <p>
+                영상과 함께 각 프레임 이미지를 ZIP으로 다운받으시겠습니까?
+              </p>
+              <div className="download-options" style={{ margin: '1rem 0' }}>
+                <label style={{ marginRight: '1rem' }}>
+                  <input
+                    type="radio"
+                    name="saveFrames"
+                    checked={saveFrames === true}
+                    onChange={() => setSaveFrames(true)}
+                  /> 예
+                </label>
+                <label>
+                  <input
+                  type="radio"
+                  name="saveFrames"
+                  checked={saveFrames === false}
+                  onChange={() => setSaveFrames(false)}
+                /> 아니요
+              </label>  
             </div>
-          </>
+          <div
+            className="path-box"
+            style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}
+          >
+            <input
+              type="text"
+              value={selectedPath}
+              readOnly
+              className="custom-path-input"
+              style={{ flex: 1 }}
+            />
+            <Button variant="gray" onClick={handlePathSelect}>
+              경로 지정
+            </Button> 
+          </div>
+        </div>
         }
       >
-        <div className="alert-buttons" style={{ marginTop: '1rem', display: 'flex', gap: '10px' }}>
+        <div 
+          className="alert-buttons"
+          style={{ marginTop: '1rem', display: 'flex', gap: '10px' }}
+        >
           <Button variant="gray" onClick={handleDownloadCancel}>이전</Button>
           <Button variant="dark" onClick={handleDownloadConfirm}>완료</Button>
         </div>

@@ -74,7 +74,12 @@ function ExplorerView({
   const navigate = useNavigate();
 
   const handleStart = () => {
-    navigate('/fileUpload', { state: { autoStart: true } });
+    navigate('/recovery', {
+      state: {
+        autoStart: true,
+        e01File: selectedE01
+      }
+    });
   };
 
   return (

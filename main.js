@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron'); // ✅ 한 줄에 다 합침
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron'); // ✅ 한 줄에 다 합침
 const path = require('path');
 const { spawn } = require('child_process');
 const readline = require('readline');
@@ -93,6 +93,7 @@ function createWindow() {
     height: 800,
     resizable: false,
     fullscreenable: false,
+    autoHideMenuBar: true,
     backgroundColor: '#ecf2f8',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -156,12 +157,10 @@ ipcMain.handle('start-recovery', (_event, e01FilePath) => {
   console.log('▶ start-recovery called with', e01FilePath);
 
   return new Promise((resolve, reject) => {
-    const scriptPath = path.join(
-      __dirname, 'python_engine', 'core', 'image_loader', 'e01_parser.py'
-    );
+    const scriptPath = path.join(__dirname, 'python_engine', 'main.py');
     const env = { ...process.env, PYTHONPATH: __dirname };
     const python = spawn('python', [scriptPath, e01FilePath], {
-      cwd: __dirname,
+      cwd: path.join(__dirname, 'python_engine'),
       shell: true,
       env,
     });
@@ -169,12 +168,35 @@ ipcMain.handle('start-recovery', (_event, e01FilePath) => {
     console.log('--- Python spawned, waiting for stdout lines ---');
 
     const rl = readline.createInterface({ input: python.stdout });
-    rl.on('line', line => {
+    rl.on('line', async line => {
       console.log('⭸ raw line:', line);
       try {
-        const { processed, total } = JSON.parse(line);
-        console.log('✔ parsed:', processed, total);
-        mainWindow.webContents.send('recovery-progress', { processed, total });
+        const data = JSON.parse(line);
+
+        // 1) 진행률 이벤트
+        if (data.processed !== undefined && data.total !== undefined) {
+          console.log('✔ parsed progress:', data.processed, data.total);
+          mainWindow.webContents.send('recovery-progress', {
+            processed: data.processed,
+            total: data.total
+          });
+          return;
+        }
+
+        // 2) analysisPath 이벤트
+        if (data.analysisPath) {
+          console.log('✔ got analysisPath:', data.analysisPath);
+          try {
+            const raw = await fs.readFile(data.analysisPath, 'utf8');
+            const results = JSON.parse(raw);
+            mainWindow.webContents.send('recovery-results', results);
+          } catch (err) {
+            console.error('Failed to read analysis.json:', err);
+            mainWindow.webContents.send('recovery-results', { error: err.message });
+          }
+          return;
+        }
+
       } catch (e) {
         console.log('⚠️ not JSON:', line);
       }

@@ -28,6 +28,7 @@
 }
 
 .button.gray:hover {
-  background-color: #cfd2d7;
+  background-color: #1f2937;
+  color: white;
   transform: translateY(-1px);
 }

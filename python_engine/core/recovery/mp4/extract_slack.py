@@ -77,11 +77,13 @@ def extract_frames(slack, slack_offset, sps_pps, output_h264_path):
     has_i_frame = any(ftype == "I" for _, ftype in matches)
     if not has_i_frame or len(matches) < 3:
         logger.info("슬랙 영역이 존재하지 않거나 복원 가능한 데이터가 없습니다.")
-        return 0
+        return 0, 0
     
     recovered = 0
+    recovered_bytes = 0
     with open(output_h264_path, 'wb') as f:
         f.write(sps_pps)
+        recovered_bytes += len(sps_pps)
         for start, ftype in matches:
             try:
                 size = struct.unpack('>I', slack[start:start + 4])[0]
@@ -94,12 +96,14 @@ def extract_frames(slack, slack_offset, sps_pps, output_h264_path):
                     logger.debug(f"슬랙 초과 frame @ offset=0x{slack_offset + start:X}")
                     continue
 
-                f.write(b'\x00\x00\x00\x01' + slack[start + 4:end])
+                chunk = (b'\x00\x00\x00\x01' + slack[start + 4:end])
+                f.write(chunk)
                 recovered += 1
+                recovered_bytes += len(chunk)
             except (struct.error, IndexError):
                 continue
 
-    return recovered
+    return recovered, recovered_bytes
 
 def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format="mp4"):
     os.makedirs(output_h264_dir, exist_ok=True)
@@ -141,12 +145,13 @@ def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format
                 "slack_rate": slack_rate
             }
 
-        frame_count = extract_frames(slack, slack_offset, sps_pps, h264_path)
-        logger.info(f"{filename} → 복구된 프레임 수: {frame_count}개")
+        frame_count, recovered_bytes = extract_frames(slack, slack_offset, sps_pps, h264_path)
+        logger.info(f"{filename} → 복구된 프레임 수: {frame_count}개, 복구 바이트: {recovered_bytes}")
 
         if frame_count > 0:
             convert_video(h264_path, mp4_path, extra_args=['-c:v', 'copy'])
             logger.info(f"{filename} → 영상 변환 완료: {mp4_path}")
+            slack_rate = recovered_bytes / len(data) * 100
             return {
                 "recovered": True,
                 "frame_count": frame_count,
@@ -160,6 +165,7 @@ def recover_mp4_slack(filepath, output_h264_dir, output_video_dir, target_format
             if os.path.exists(h264_path):
                 os.remove(h264_path)
             logger.info(f"{filename} → 유효한 프레임 없음 (삭제됨)")
+            slack_rate = 0.0
             return {
                 "recovered": False,
                 "frame_count": 0,
