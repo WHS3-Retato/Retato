@@ -179,7 +179,7 @@ body {
 /* Result-page */
 
 .result-group {
-  margin: 1rem 0;
+  margin: 1rem;
 }
 
 .result-group-header {
@@ -219,7 +219,7 @@ body {
 }
 
 .result-file-list {
-  margin-left: 2rem;
+  margin-left: 3.5rem;
 }
 
 .result-file-item {

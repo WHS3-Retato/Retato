@@ -234,3 +234,71 @@ h1 {
   font-size: 13px;
   color: #6b7280;
 }
+
+/* ++ 다크모드 ++ */
+
+.main_content.dark-mode {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+.main_content.dark-mode .folder_item {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+.main_content.dark-mode .folder_item:hover {
+  background-color: #334155;
+}
+
+.main_content.dark-mode .selected_box {
+  background-color: #1e293b;
+  border: 1px solid #475569;
+  color: #f8fafc;
+}
+
+.main_content.dark-mode h1 {
+  color: #f8fafc;
+}
+
+.main_content.dark-mode .drive_category {
+  background-color: #1e293b;
+  box-shadow: inset -4px -4px 4px rgba(255, 255, 255, 0.02),
+    0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.main_content.dark-mode .drive_card {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.main_content.dark-mode .drive_card:hover {
+  border-color: #94a3b8;
+}
+
+.main_content.dark-mode .drive_header {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+.main_content.dark-mode .bar {
+  background-color: #334155;
+}
+
+.main_content.dark-mode .bar_fill {
+  background-color: #3b82f6;
+}
+
+.main_content.dark-mode .file_size,
+.main_content.dark-mode .drive_path_text,
+.main_content.dark-mode .drive_path,
+.main_content.dark-mode .drive_title {
+  color: #cbd5e1;
+}
+
+.main_content.dark-mode button {
+  background-color: #f1f5f9;
+  color: #1e293b;
+  font-weight: 600;
+}

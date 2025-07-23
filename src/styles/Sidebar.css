@@ -109,3 +109,7 @@ body {
   background-color: rgba(255, 255, 255, 0.2); /* 20% 투명한 흰색 */
   border: none;
 }
+
+:root.dark-mode {
+  --background: #0f172a;
+}

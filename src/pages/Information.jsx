@@ -10,11 +10,11 @@ const Information = () => {
         <h1>  소프트웨어 정보</h1>
         <table className="info_table">
           <tbody>
-            <tr>
+            <tr className="stack-divider">
               <th>제품명</th>
               <td>RETATO</td>
             </tr>
-            <tr>
+            <tr className="stack-divider">
               <th>버전</th>
               <td>v1.0.0</td>
             </tr>
@@ -31,16 +31,16 @@ const Information = () => {
         <h1>  개발자 정보</h1>
         <table className="info_table">
           <tbody>
-            <tr>
+            <tr className="stack-divider">
               <th>팀</th>
               <td>복원하는 감자입니다만...?</td>
             </tr>
-            <tr>
+            <tr className="stack-divider">
               <th>소속</th>
               <td>화이트햇 스쿨 3기</td>
             </tr>
             <tr>
-              <th>GitHub:</th>
+              <th>GitHub</th>
               <td><a href="https://github.com/WHS3-Retato/Retato" target="_blank" rel="noreferrer">https://github.com/WHS3-Retato/Retato</a></td>
             </tr>
           </tbody>
@@ -48,15 +48,36 @@ const Information = () => {
       </div>
 
       {/* 기술 스택 */}
+
       <div className="info_box">
-        <h1>  기술 스택</h1>
-        <div className="tech_stack">
-          <div><strong>프론트엔드</strong> <span className="tag">Electron</span> <span className="tag">React</span> <span className="tag">JavaScript</span></div>
-          <div><strong>백엔드</strong> <span className="tag">Python</span> <span className="tag">Node.js</span></div>
-          <div><strong>기타 도구</strong> <span className="tag">FFmpeg</span></div>
+        <h1>  스택 정보</h1>
+          <table className="info_table">
+            <tbody>
+              <tr className="stack-divider">
+                <th>프론트엔드</th>
+                <td>
+                  <span className="tag">Electron</span>
+                  <span className="tag">React</span>
+                  <span className="tag">JavaScript</span>
+                </td>
+              </tr>
+              <tr className="stack-divider">
+                <th>백엔드</th>
+                <td>
+                  <span className="tag">Python</span>
+                  <span className="tag">Node.js</span>
+                </td>
+              </tr>
+              <tr>
+                <th>기타 도구</th>
+                <td>
+                  <span className="tag">FFmpeg</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
   );
 };
 

@@ -690,36 +690,36 @@ useEffect(() => {
           <div className={`parser-tab-content ${activeTab === 'basic' ? 'active' : ''}`}>
             <div className="parser-info-table">
               <div className="parser-info-row">
-                <span className="parser-info-label">파일 포맷:</span>
+                <span className="parser-info-label">파일 포맷</span>
                 <span className="parser-info-value">{analysis.basic.format}</span>
               </div>
 
               {/* 파일시스템에서 시간 파싱하지 말고 복구 시간만 표시하기 */}
               <div className="parser-info-row">
-                <span className="parser-info-label">복구 시간:</span>
+                <span className="parser-info-label">복구 시간</span>
                 <span className="parser-info-value">{analysis.basic.timestamps.created}</span>
               </div>
 
               <div className="parser-info-row">
-                <span className="parser-info-label">파일 크기:</span>
+                <span className="parser-info-label">파일 크기</span>
                 <span className="parser-info-value">
                   {bytesToMB(analysis.basic.file_size)}
                 </span>
               </div>
               <div className="parser-info-row">
-                <span className="parser-info-label">비디오 코덱:</span>
+                <span className="parser-info-label">비디오 코덱</span>
                 <span className="parser-info-value">
                   {formatCodec(analysis.basic.video_metadata.codec)}
                 </span>
               </div>
               <div className="parser-info-row">
-                <span className="parser-info-label">해상도:</span>
+                <span className="parser-info-label">해상도</span>
                 <span className="parser-info-value">
                   {analysis.basic.video_metadata.width}×{analysis.basic.video_metadata.height}
                 </span>
               </div>
               <div className="parser-info-row">
-                <span className="parser-info-label">프레임 레이트:</span>
+                <span className="parser-info-label">프레임 레이트</span>
                 <span className="parser-info-value">
                   {Math.round(analysis.basic.video_metadata.frame_rate)} fps
                 </span>
@@ -730,7 +730,7 @@ useEffect(() => {
           <div className={`parser-tab-content ${activeTab === 'integrity' ? 'active' : ''}`}>
             <div className="parser-info-table">
               <div className="parser-info-row">
-                <span className="parser-info-label">전체 상태:</span>
+                <span className="parser-info-label">전체 상태</span>
                 <span className="parser-info-value">
                   <img
                     src={analysis.integrity.damaged ? integrityRed : integrityGreen}
@@ -744,7 +744,7 @@ useEffect(() => {
               </div>
               {analysis.integrity.damaged && analysis.integrity.reasons.length > 0 && (
                 <div className="parser-info-row">
-                  <span className="parser-info-label">손상 사유:</span>
+                  <span className="parser-info-label">손상 사유</span>
                   <span className="parser-info-value">
                     <ul className="reason-list">
                       {analysis.integrity.reasons.map((reason, idx) => (
@@ -760,11 +760,11 @@ useEffect(() => {
           <div className={`parser-tab-content ${activeTab === 'slack' ? 'active' : ''}`}>
             <div className="parser-info-table">
               <div className="parser-info-row">
-                <span className="parser-info-label">슬랙 비율:</span>
+                <span className="parser-info-label">슬랙 비율</span>
                 <span className="parser-info-value">{slackPercent} %</span>
               </div>
               <div className="parser-info-row">
-                <span className="parser-info-label">유효 데이터 비율:</span>
+                <span className="parser-info-label">유효 데이터 비율</span>
                 <span className="parser-info-value">
                   {(100 - (slack_info?.slack_rate ?? 0) * 100).toFixed(1)} %
                 </span>
@@ -803,7 +803,7 @@ useEffect(() => {
         <div className="result-wrapper">
           {/* 요약: 개수 + 전체 용량 */}
           <p className="result-summary">
-            총 {results.length}개의 파일, 용량:{' '}
+            총 {results.length}개의 파일, 용량{' '}
             {bytesToMB(
               results.reduce((sum, f) => sum + f.size, 0)
             )}
@@ -850,7 +850,7 @@ useEffect(() => {
                                 {slackRatePercent > 0 && <Badge label="슬랙 포함" />}
                               </div>
                             <br />
-                            {mb} MB ・ 슬랙비율: {slackRatePercent} %
+                            {mb} MB ・ 슬랙비율 {slackRatePercent} %
                           </div>
                         </div>
                       )
