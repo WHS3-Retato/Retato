@@ -9,6 +9,12 @@
   margin-bottom: 1.2rem;
 }
 
+.info_section_title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
 .info_box {
   background: white;
   border-radius: 0.7rem;
@@ -34,14 +40,14 @@
   text-align: left;
   width: 90px;
   font-weight: 500;
-  padding: 0.2rem 0;
+  padding: 0.4rem 0;
   vertical-align: top;
   font-size: 0.9rem;
   color: #444;
 }
 
 .info_table td {
-  padding: 0.2rem 0;
+  padding: 0.4rem 0;
   font-size: 0.9rem;
   color: #333;
 }
@@ -59,7 +65,7 @@
   padding: 0.2rem 0.5rem;
   border-radius: 0.4rem;
   font-size: 0.75rem;
-  margin-right: 0.3rem;
+  margin-right: 1rem;
 }
 
 
