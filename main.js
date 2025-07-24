@@ -302,11 +302,13 @@ ipcMain.handle('run-download', (_event, { e01Path, choice, downloadDir }) => {
   });
 });
 
-ipcMain.handle('dialog:openDirectory', async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
+ipcMain.handle('dialog:openDirectory', async (_event, options = {}) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+    ...options
   });
-  return result;
+  if (canceled) return null;
+  return filePaths[0];
 });
 
 ipcMain.handle('clear-cache', async () => {

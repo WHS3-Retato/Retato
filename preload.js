@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('api', {
   readFolder: (path) => ipcRenderer.invoke('read-folder', path),
   sendFilePath: (path) => ipcRenderer.send('file-selected', path),
   selectFolder: () => ipcRenderer.invoke('dialog:openDirectory'),
+  openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   openE01File: () => ipcRenderer.invoke('dialog:openE01File'),
   startRecovery: (e01Path) => ipcRenderer.invoke('start-recovery', e01Path),
   clearCache: () => ipcRenderer.invoke('clear-cache'),

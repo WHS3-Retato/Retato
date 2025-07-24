@@ -50,6 +50,8 @@ def main(e01_path, choice=None, download_dir=None):
         print("▶ 영상 저장 시작...", file=sys.stderr)
         # 전체 채널(.mp4, .avi)
         for root, _, files in os.walk(output_dir):
+            if os.path.basename(root) == "slack":
+                continue
             for f in files:
                 if f.lower().endswith((".mp4", ".avi")):
                     src = os.path.join(root, f)

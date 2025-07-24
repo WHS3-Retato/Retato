@@ -61,7 +61,7 @@ const Recovery = () => {
       return acc
     }, {})
   }
-  const groupedResults = useMemo(() => groupByCategory(results), [results])``
+  const groupedResults = useMemo(() => groupByCategory(results), [results])
 
   const [selectedAnalysisFile, setSelectedAnalysisFile] = useState(null);
   const [activeTab, setActiveTab] = useState('basic');
@@ -314,9 +314,10 @@ const Recovery = () => {
   };
 
   const handlePathSelect = async () => {
-    const result = await window.api.openDirectory();
-    if (!result.canceled && result.filePaths.length > 0) {
-      setSelectedPath(result.filePaths[0]);
+    const dir = await window.api.selectFolder();
+    if (dir) {
+      console.log('선택된 폴더:', dir);
+      setSelectedPath(dir);
     }
   };
 
