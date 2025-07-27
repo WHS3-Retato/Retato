@@ -1,17 +1,107 @@
-<<<<<<< HEAD
-# Retato
-🎞️Retato - 블랙박스 영상 복구 및 분석 도구
-=======
-# React + Vite
+# 🎞️Retato - 블랙박스 영상 복구 및 분석 도구
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+E01 디스크 이미지에서 영상을 추출하고, 슬랙 공간에 존재하는 잔여 영상까지 복원해주는 데스크탑 애플리케이션입니다.  
+Electron + React 기반으로 제작되었으며, 복원된 영상은 직관적인 UI를 통해 영상을 탐색하고 다운로드할 수 있습니다.
 
-Currently, two official plugins are available:
+<br />
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 📂 목차
+1. [🚀 시작하기](#-시작하기)
+2. [🧰 주요 기능](#-주요-기능)
+3. [🪧 메뉴별 기능 안내](#-메뉴별-기능-안내)
+4. [💻 설치](#-설치)
+   
+<br />
 
-## Expanding the ESLint configuration
+## 🚀 시작하기
+Retato를 통해 `.e01` 디스크 이미지에서 영상을 복원하는 전체 흐름은 다음과 같습니다.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
->>>>>>> 180d45d (init: 프론트엔드 구조 및 UI 초안 커밋)
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/8c81dcc7-147a-4b81-b767-e95d0d007dec" alt="전체흐름" />
+</div>
+
+1️⃣ `.e01` 파일을 선택합니다.  
+2️⃣ Retato가 자동으로 분석을 시작하고, 영상 및 슬랙 공간에서 데이터를 복원합니다.  
+3️⃣ 복원된 영상 목록을 확인하고 다운로드합니다.
+
+<br />
+
+## 📌 주요 기능
+- **E01 파일 선택 및 분석 자동화**
+- **영상 및 슬랙 영상 추출**
+- **복원 영상별 분석 결과 제공**
+- **사용자 지정 경로로 영상/프레임 다운로드**
+- **다크/라이트 모드 전환 지원**
+- **임시 캐시 파일 삭제 기능**
+- **알림 기능 on/off 설정**
+
+<br />
+
+## 🪧 메뉴별 기능 안내
+
+### 🏠 Home
+- 로컬 드라이브 자동 인식  
+- 드라이브 내 폴더 탐색 가능  
+- `.e01` 파일 선택 후 복원 시작 가능
+
+<br />
+
+### 🛠 Recovery
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/1c06973e-a98d-4248-b08f-227fa4f86696" alt="복원리스트" />
+</div>
+
+- 복원 시작을 위한 파일 탐색기 사용  
+- 영상 추출 + 슬랙 영상 복원 + 분석 동시 진행  
+- 복원 완료 시 영상 리스트 확인 가능
+- 슬랙이 있는 영상은 `슬랙` 태그로 표시 
+- 영상 리스트 클릭 시 상세 정보 확인
+  - 손상 파일의 경우 손상 사유 확인 가능
+- `슬랙` 태그 클릭 시, 해당 영상의 슬랙 복원본 확인
+
+<br />
+
+### 📦 다운로드 기능
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/c039328a-c3a9-4013-bf05-26f090f6c785" alt="다운로드" />
+</div>
+
+- 복원 영상 일괄 다운로드 가능  
+  - 예 선택 시 → 원본 + 슬랙 영상 + 프레임 이미지(`.zip`) 파일 다운로드  
+  - 아니오 선택 시 → 원본 + 슬랙 영상만 다운로드  
+- 원하는 폴더로 경로 지정 가능
+
+
+<br />
+
+### ⚙️ 설정
+<div align="center">
+  <img width="800" alt="image" src="https://github.com/user-attachments/assets/eaebc74f-1ec3-410d-8482-6f8482697f4f" />
+</div>
+
+- 다크모드 / 라이트모드 전환  
+- 캐시 파일 삭제 (`retato_xxx` 등 temp 파일 제거)  
+- 알림 기능 켜기/끄기
+
+<br />
+
+### ℹ️ 정보
+<div align="center">
+  <img width="800" alt="image" src="https://github.com/user-attachments/assets/13510862-9a18-464e-830d-1565f9aea949" />
+</div>
+
+- Retato 버전 및 개발자 정보, 기술 스택 정보 제공
+  
+<br />
+
+## 💻 설치
+1. 아래 링크에서 최신 버전의 Retato 설치 파일(`.exe`)을 다운로드합니다.
+
+   👉 [Retato 다운로드 (.exe)](https://github.com/WHS3-Retato/Retato/releases/latest)
+   (릴리즈 후 수정하겠습니다..!)
+
+3. 다운로드한 `.exe` 파일을 실행하여 설치를 진행합니다.  
+   (설치 과정은 기본 설정으로 진행하면 됩니다.)
+
+4. 설치가 완료되면 바탕화면 또는 시작 메뉴에서 **Retato**를 실행할 수 있습니다.
+
