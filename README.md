@@ -2,7 +2,7 @@
 
    <h1>🎞️ Retato 블랙박스 영상 복구 및 분석 도구</h1> 
 
-   <img width="100%" alt="Retato 배너" src="https://github.com/user-attachments/assets/1c866b88-45ad-466b-9981-0c43d62b5c94" />
+   <img width=100% alt="Retato 배너" src="https://github.com/user-attachments/assets/ba3f57fe-80f8-4e28-9c62-fac9325d23e5" />
 
    <p>
      E01 디스크 이미지에서 영상과 슬랙 공간의 잔여 영상까지 복원할 수 있는 데스크탑 애플리케이션입니다.<br />
