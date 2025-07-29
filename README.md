@@ -1,19 +1,26 @@
-# 🎞️Retato - 블랙박스 영상 복구 및 분석 도구
+<div align="center">
 
-E01 디스크 이미지에서 영상을 추출하고, 슬랙 공간에 존재하는 잔여 영상까지 복원해주는 데스크탑 애플리케이션입니다.  
-Electron + React 기반으로 제작되었으며, 복원된 영상은 직관적인 UI를 통해 영상을 탐색하고 다운로드할 수 있습니다.
+   <h1>🎞️ Retato 블랙박스 영상 복구 및 분석 도구</h1> 
+
+   <img width="100%" alt="Retato 배너" src="https://github.com/user-attachments/assets/1c866b88-45ad-466b-9981-0c43d62b5c94" />
+
+   <p>
+     E01 디스크 이미지에서 영상과 슬랙 공간의 잔여 영상까지 복원할 수 있는 데스크탑 애플리케이션입니다.<br />
+     복원된 영상은 리스트 형태로 정리되어 있으며, 각 영상을 직접 확인하고 원하는 경로에 저장할 수 있습니다.
+   </p>
+</div>
 
 <br />
 
-## 📂 목차
-1. [🚀 시작하기](#-시작하기)
-2. [🧰 주요 기능](#-주요-기능)
-3. [🪧 메뉴별 기능 안내](#-메뉴별-기능-안내)
-4. [💻 설치](#-설치)
+## 목차
+1. [시작하기](#시작하기)
+2. [주요 기능](#주요-기능)
+3. [메뉴별 기능 안내](#메뉴별-기능-안내)
+4. [설치](#설치)
    
 <br />
 
-## 🚀 시작하기
+## 시작하기
 Retato를 통해 `.e01` 디스크 이미지에서 영상을 복원하는 전체 흐름은 다음과 같습니다.
 
 <div align="center">
@@ -22,11 +29,11 @@ Retato를 통해 `.e01` 디스크 이미지에서 영상을 복원하는 전체 
 
 1️⃣ `.e01` 파일을 선택합니다.  
 2️⃣ Retato가 자동으로 분석을 시작하고, 영상 및 슬랙 공간에서 데이터를 복원합니다.  
-3️⃣ 복원된 영상 목록을 확인하고 다운로드합니다.
+3️⃣ 복원된 영상 목록을 미리보기 및 분석 결과와 함께 확인한 후 다운로드합니다.
 
 <br />
 
-## 📌 주요 기능
+## 주요 기능
 - **E01 파일 선택 및 분석 자동화**
 - **영상 및 슬랙 영상 추출**
 - **복원 영상별 분석 결과 제공**
@@ -37,16 +44,16 @@ Retato를 통해 `.e01` 디스크 이미지에서 영상을 복원하는 전체 
 
 <br />
 
-## 🪧 메뉴별 기능 안내
+## 메뉴별 기능 안내
 
-### 🏠 Home
+### Home
 - 로컬 드라이브 자동 인식  
 - 드라이브 내 폴더 탐색 가능  
 - `.e01` 파일 선택 후 복원 시작 가능
 
 <br />
 
-### 🛠 Recovery
+### Recovery
 <div align="center">
   <img src="https://github.com/user-attachments/assets/1c06973e-a98d-4248-b08f-227fa4f86696" alt="복원리스트" />
 </div>
@@ -61,7 +68,7 @@ Retato를 통해 `.e01` 디스크 이미지에서 영상을 복원하는 전체 
 
 <br />
 
-### 📦 다운로드 기능
+#### 다운로드 기능
 <div align="center">
   <img src="https://github.com/user-attachments/assets/c039328a-c3a9-4013-bf05-26f090f6c785" alt="다운로드" />
 </div>
@@ -74,7 +81,7 @@ Retato를 통해 `.e01` 디스크 이미지에서 영상을 복원하는 전체 
 
 <br />
 
-### ⚙️ 설정
+### Setting
 <div align="center">
   <img width="800" alt="image" src="https://github.com/user-attachments/assets/eaebc74f-1ec3-410d-8482-6f8482697f4f" />
 </div>
@@ -85,7 +92,7 @@ Retato를 통해 `.e01` 디스크 이미지에서 영상을 복원하는 전체 
 
 <br />
 
-### ℹ️ 정보
+### Information
 <div align="center">
   <img width="800" alt="image" src="https://github.com/user-attachments/assets/13510862-9a18-464e-830d-1565f9aea949" />
 </div>
@@ -94,7 +101,7 @@ Retato를 통해 `.e01` 디스크 이미지에서 영상을 복원하는 전체 
   
 <br />
 
-## 💻 설치
+## 설치
 1. 아래 링크에서 최신 버전의 Retato 설치 파일(`.exe`)을 다운로드합니다.
 
    👉 [Retato 다운로드 (.exe)](https://github.com/WHS3-Retato/Retato/releases/latest)
